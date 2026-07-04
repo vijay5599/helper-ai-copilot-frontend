@@ -7,6 +7,26 @@ Currently, two official plugins are available:
 - [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
 - [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
 
+
+### For Developers: How to Build the App
+If you are a developer looking to clone this project and build the `.dmg` file yourself from the source code, follow these steps:
+
+1. **Prerequisites**: Ensure you have Node.js and npm installed.
+2. **Clone the repository** and navigate to the frontend directory:
+   ```bash
+   cd frontend
+   ```
+3. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+4. **Build the Application**:
+   - **For Mac**: `npm run build:mac` (creates a `.dmg`)
+   - **For Windows**: `npm run build:win` (creates a `.exe` installer)
+
+5. Once finished, you will find the final installer in the `release/` folder!
+
+
 ## React Compiler
 
 The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).

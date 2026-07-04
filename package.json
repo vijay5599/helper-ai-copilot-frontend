@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:mac": "npm run build && electron-builder --mac",
+    "build:win": "npm run build && electron-builder --win",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -16,6 +17,9 @@
     "productName": "HelperAI",
     "mac": {
       "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
     },
     "directories": {
       "output": "release/"
