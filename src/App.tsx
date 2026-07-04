@@ -7,9 +7,9 @@ function App() {
   const [transcript, setTranscript] = useState("Waiting for speech...")
   const transcriptRef = useRef("Waiting for speech...")
 
-  const [history, setHistory] = useState<{question: string, answer: string}[]>([])
+  const [history, setHistory] = useState<{ question: string, answer: string }[]>([])
   const [currentIndex, setCurrentIndex] = useState(-1)
-  
+
   const [showSettings, setShowSettings] = useState(false)
   const [showAnswerPanel, setShowAnswerPanel] = useState(true)
   const [resume, setResume] = useState(() => localStorage.getItem('resume') || '')
@@ -22,6 +22,10 @@ function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
+
+  const audioContextRef = useRef<AudioContext | null>(null)
+  const micStreamRef = useRef<MediaStream | null>(null)
+  const systemStreamRef = useRef<MediaStream | null>(null)
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -84,9 +88,9 @@ function App() {
         setHistory(prev => {
           if (prev.length === 0) return prev;
           const newHistory = [...prev];
-          newHistory[newHistory.length - 1] = { 
-            ...newHistory[newHistory.length - 1], 
-            answer: data.text 
+          newHistory[newHistory.length - 1] = {
+            ...newHistory[newHistory.length - 1],
+            answer: data.text
           };
           return newHistory;
         });
@@ -100,19 +104,29 @@ function App() {
       ws.close()
       ipcRenderer.removeListener('trigger-llm', handleTrigger)
       mediaRecorderRef.current?.stop()
+      
+      micStreamRef.current?.getTracks().forEach(t => t.stop())
+      systemStreamRef.current?.getTracks().forEach(t => t.stop())
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close()
+      }
     }
   }, [])
 
   const startAudioCapture = async (ws: WebSocket) => {
     try {
       const micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      micStreamRef.current = micStream;
+      
       const systemStream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true })
+      systemStreamRef.current = systemStream;
 
       if (videoRef.current) {
         videoRef.current.srcObject = systemStream
       }
 
       const audioContext = new AudioContext()
+      audioContextRef.current = audioContext;
       const dest = audioContext.createMediaStreamDestination()
 
       const micSource = audioContext.createMediaStreamSource(micStream)
@@ -312,7 +326,7 @@ function App() {
       </div>
 
       <div className="[-webkit-app-region:no-drag] mt-2 bg-[#1C1C1E] rounded-[16px] border border-white/10 px-4 py-2.5 flex justify-between items-center text-[13px] text-zinc-300 font-medium tracking-wide backdrop-blur-2xl">
-        <div className="truncate pr-4 flex-1">{transcript || "Waiting for transcript..."}</div>
+        <div className="truncate pr-4 flex-1 text-wrap">{transcript || "Waiting for transcript..."}</div>
         <div className="flex items-center gap-2 opacity-40">
           <button onClick={() => setShowAnswerPanel(!showAnswerPanel)} className="hover:opacity-100 cursor-pointer p-0.5">
             {showAnswerPanel ? (
