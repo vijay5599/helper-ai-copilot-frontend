@@ -1,15 +1,34 @@
-# React + TypeScript + Vite
+# HelperAI Copilot
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+HelperAI is a floating desktop AI assistant built with React, Vite, Electron, and FastAPI. It analyzes your screen context in real-time and provides intelligent coding assistance—especially designed to help you solve LeetCode-style coding challenges!
 
-Currently, two official plugins are available:
+## 🚀 How to Use the App
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Once you have installed and opened the `HelperAI` application, it will run as a sleek, transparent toolbar that sits on top of all your other windows.
 
+### Analyzing Your Screen (The "LeetCode Mode")
+1. Open a coding challenge (like LeetCode, HackerRank, or an IDE) on your screen.
+2. Bring the **HelperAI** toolbar into view.
+3. Click the **"Analyze Screen"** button (or press your global shortcut if configured).
+4. The AI will instantly read the problem on your screen, determine the optimal solution, and stream the bug-free code (along with time and space complexity) directly into the answer panel!
 
-### For Developers: How to Build the App
-If you are a developer looking to clone this project and build the `.dmg` file yourself from the source code, follow these steps:
+### Asking Voice Questions
+1. Click the **"AI Help"** button.
+2. The AI will listen to your microphone using Deepgram.
+3. Speak your question out loud (e.g., *"How do I reverse a linked list in Python?"*).
+4. The AI will stream the answer back to you in real-time!
+
+### Navigating History
+During long coding sessions, the AI remembers your previous questions!
+* Use the **Left (←)** and **Right (→)** arrows in the answer panel to scroll back through past questions and answers.
+* Click the small **X** next to an answer to delete that specific question from your history.
+* Click the main **Clear** button (broom icon) in the top toolbar to completely wipe all history and reset the session.
+
+---
+
+## 🛠️ For Developers: How to Build the App
+
+If you are a developer looking to clone this project and build the `.dmg` or `.exe` file yourself from the source code, follow these steps:
 
 1. **Prerequisites**: Ensure you have Node.js and npm installed.
 2. **Clone the repository** and navigate to the frontend directory:
@@ -26,28 +45,3 @@ If you are a developer looking to clone this project and build the `.dmg` file y
    - **For Windows**: `npm run build:win` (creates a `.exe` installer)
 
 5. Once finished, you will find the final installer in the `release/` folder!
-
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
-```
-
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.

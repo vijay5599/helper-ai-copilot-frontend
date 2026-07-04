@@ -14,17 +14,43 @@ function App() {
   const [showAnswerPanel, setShowAnswerPanel] = useState(true)
   const [resume, setResume] = useState(() => localStorage.getItem('resume') || '')
   const [jobRole, setJobRole] = useState(() => localStorage.getItem('jobRole') || '')
+  const [appOpacity, setAppOpacity] = useState(() => parseFloat(localStorage.getItem('appOpacity') || '0.95'))
   const [timer, setTimer] = useState(0)
 
   const wsRef = useRef<WebSocket | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      const isExpanded = showAnswerPanel && history.length > 0 && !showSettings;
+      // Only auto-shrink when the panel is closed, otherwise let the user manually resize
+      if (!isExpanded) {
+        for (let entry of entries) {
+          ipcRenderer.send('resize-window', { height: entry.contentRect.height });
+        }
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [showAnswerPanel, history.length, showSettings]);
+
+  useEffect(() => {
+    const isExpanded = showAnswerPanel && history.length > 0 && !showSettings;
+    if (isExpanded) {
+      // Expand to a good default height when opened
+      ipcRenderer.send('resize-window', { height: 600 });
+    }
+  }, [showAnswerPanel, history.length, showSettings]);
 
   useEffect(() => {
     localStorage.setItem('resume', resume)
     localStorage.setItem('jobRole', jobRole)
-  }, [resume, jobRole])
+    localStorage.setItem('appOpacity', appOpacity.toString())
+  }, [resume, jobRole, appOpacity])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -237,11 +263,11 @@ function App() {
   const currentItem = history[currentIndex];
 
   return (
-    <div className="w-screen h-screen flex flex-col font-sans select-none overflow-hidden relative text-white bg-transparent">
+    <div ref={containerRef} className={`w-full flex flex-col font-sans select-none overflow-hidden relative text-white bg-transparent ${showAnswerPanel && currentItem && !showSettings ? 'h-screen' : 'h-auto'}`} style={{ opacity: appOpacity }}>
       <video ref={videoRef} autoPlay playsInline muted className="hidden" />
       <canvas ref={canvasRef} className="hidden" />
 
-      <div className="[-webkit-app-region:drag] mx-2 mt-2 bg-[#1C1C1E] rounded-[16px] border border-zinc-700/50 shadow-2xl flex items-center justify-between p-2 px-3 backdrop-blur-2xl">
+      <div className="[-webkit-app-region:drag] mt-2 bg-[#1C1C1E] rounded-[16px] border border-white/10 flex items-center justify-between p-2 px-3 backdrop-blur-2xl">
         <div className="flex items-center gap-3 pl-1">
           <div className="flex items-center gap-2 font-bold text-[15px] tracking-wide text-zinc-100">
             <span className="text-xl">🧑‍💻</span>
@@ -285,7 +311,7 @@ function App() {
         </div>
       </div>
 
-      <div className="[-webkit-app-region:no-drag] mx-2 mt-2 bg-[#1C1C1E]/95 border border-zinc-700/50 rounded-xl px-4 py-2.5 flex justify-between items-center text-[13px] text-zinc-300 font-medium tracking-wide shadow-lg">
+      <div className="[-webkit-app-region:no-drag] mt-2 bg-[#1C1C1E] rounded-[16px] border border-white/10 px-4 py-2.5 flex justify-between items-center text-[13px] text-zinc-300 font-medium tracking-wide backdrop-blur-2xl">
         <div className="truncate pr-4 flex-1">{transcript || "Waiting for transcript..."}</div>
         <div className="flex items-center gap-2 opacity-40">
           <button onClick={() => setShowAnswerPanel(!showAnswerPanel)} className="hover:opacity-100 cursor-pointer p-0.5">
@@ -302,15 +328,19 @@ function App() {
       </div>
 
       {showSettings && (
-        <div className="[-webkit-app-region:no-drag] mx-2 mt-2 bg-[#1C1C1E]/95 backdrop-blur-3xl rounded-[16px] border border-zinc-700/50 p-5 shadow-2xl z-10 flex flex-col gap-4">
+        <div className="[-webkit-app-region:no-drag] mt-2 bg-[#1C1C1E]/95 backdrop-blur-3xl rounded-[16px] border border-white/10 p-5 z-10 flex flex-col gap-4">
           <h2 className="text-zinc-100 font-bold text-base tracking-wide">Settings</h2>
+          <div className="flex flex-col gap-2">
+            <label className="text-zinc-300 text-[13px] font-semibold tracking-wide">App Opacity: {Math.round(appOpacity * 100)}%</label>
+            <input type="range" min="0.1" max="1" step="0.05" value={appOpacity} onChange={(e) => setAppOpacity(parseFloat(e.target.value))} className="accent-blue-500 cursor-pointer" />
+          </div>
           <input type="text" value={jobRole} onChange={(e) => setJobRole(e.target.value)} placeholder="Target Job Role" className="bg-[#09090B] border border-zinc-800 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none" />
           <textarea value={resume} onChange={(e) => setResume(e.target.value)} placeholder="Resume Context" rows={5} className="bg-[#09090B] border border-zinc-800 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none" />
         </div>
       )}
 
       {!showSettings && currentItem && showAnswerPanel && (
-        <div className="[-webkit-app-region:no-drag] mx-2 mt-2 bg-[#1C1C1E]/95 backdrop-blur-3xl rounded-[16px] border border-zinc-700/50 p-6 shadow-2xl flex-1 mb-2 overflow-hidden flex flex-col">
+        <div className="[-webkit-app-region:no-drag] mt-2 bg-[#1C1C1E]/95 backdrop-blur-3xl rounded-[16px] border border-white/10 p-6 flex-1 mb-2 overflow-hidden flex flex-col">
           <div className="flex justify-between items-start mb-5">
             <div className="flex gap-3 text-zinc-500">
               <button onClick={goBack} disabled={currentIndex <= 0} className="hover:text-zinc-300 disabled:opacity-30 bg-zinc-800/30 p-1.5 rounded-md"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"></polyline></svg></button>

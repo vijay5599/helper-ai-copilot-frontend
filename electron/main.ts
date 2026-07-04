@@ -21,7 +21,7 @@ function createWindow() {
   });
 
   // Hides the window from screen capturing software (Zoom, Meet, OBS)
-  mainWindow.setContentProtection(true); // Commented out temporarily for screenshots
+  // mainWindow.setContentProtection(true); // Commented out temporarily for screenshots
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
@@ -61,6 +61,13 @@ app.whenReady().then(() => {
     console.log('Ctrl+Enter is pressed: Triggering LLM');
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('trigger-llm');
+    }
+  });
+
+  ipcMain.on('resize-window', (event, { height }) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      const [currentWidth] = mainWindow.getSize();
+      mainWindow.setContentSize(currentWidth, Math.ceil(height));
     }
   });
 
