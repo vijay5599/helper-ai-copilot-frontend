@@ -21,7 +21,7 @@ function createWindow() {
   });
 
   // Hides the window from screen capturing software (Zoom, Meet, OBS)
-  // mainWindow.setContentProtection(true); // Commented out temporarily for screenshots
+  mainWindow.setContentProtection(true); // Commented out temporarily for screenshots
 
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
