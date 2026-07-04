@@ -14,7 +14,8 @@ If you are a developer looking to clone this project and build the `.dmg` file y
 1. **Prerequisites**: Ensure you have Node.js and npm installed.
 2. **Clone the repository** and navigate to the frontend directory:
    ```bash
-   cd frontend
+   git clone https://github.com/vijay5599/helper-ai-copilot-frontend.git
+   cd helper-ai-copilot-frontend
    ```
 3. **Install dependencies**:
    ```bash
