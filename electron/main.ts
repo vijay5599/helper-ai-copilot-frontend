@@ -38,6 +38,7 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
   if (process.platform === 'darwin') {
     systemPreferences.askForMediaAccess('microphone');
     // Hide the app from the macOS Dock
@@ -52,10 +53,15 @@ app.whenReady().then(() => {
 
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
     desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-      // Select the first screen source to resolve the getDisplayMedia promise
-      callback({ video: sources[0], audio: 'loopback' });
+      if (sources && sources.length > 0) {
+        callback({ video: sources[0], audio: 'loopback' });
+      } else {
+        // Must call callback with null or throw to prevent promise from hanging
+        callback(null as any);
+      }
     }).catch(err => {
       console.log('desktopCapturer error:', err);
+      callback(null as any);
     });
   });
 

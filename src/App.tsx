@@ -120,11 +120,14 @@ function App() {
       const micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
       micStreamRef.current = micStream;
       
-      const systemStream = await navigator.mediaDevices.getDisplayMedia({ audio: true, video: true })
-      systemStreamRef.current = systemStream;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = systemStream
+      let systemStream: MediaStream | null = null;
+      try {
+        systemStream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+        if (videoRef.current) {
+          videoRef.current.srcObject = systemStream
+        }
+      } catch (e) {
+        console.warn("Could not get display media (screen recording permissions might be denied).", e)
       }
 
       const audioContext = new AudioContext()
@@ -134,16 +137,48 @@ function App() {
       const micSource = audioContext.createMediaStreamSource(micStream)
       micSource.connect(dest)
 
-      if (systemStream.getAudioTracks().length > 0) {
-        const systemSource = audioContext.createMediaStreamSource(systemStream)
-        systemSource.connect(dest)
+      // Find BlackHole for System Audio
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(d => d.kind === 'audioinput');
+      console.log("Available audio inputs:", audioInputs.map(d => d.label));
+      
+      const blackHole = audioInputs.find(d => d.label.toLowerCase().includes('blackhole'));
+      
+      if (blackHole) {
+        console.log("Found BlackHole! Attempting to connect...", blackHole.label);
+        try {
+          const bhStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: { 
+              deviceId: { exact: blackHole.deviceId },
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false
+            } 
+          });
+          systemStreamRef.current = bhStream;
+          const systemSource = audioContext.createMediaStreamSource(bhStream);
+          systemSource.connect(dest);
+          console.log("Successfully connected BlackHole for System Audio");
+        } catch(e) {
+          console.error("Failed to connect BlackHole", e);
+        }
+      } else if (systemStream) {
+        console.log("BlackHole not found. Falling back to default system audio.");
+        systemStreamRef.current = systemStream;
+        if (systemStream.getAudioTracks().length > 0) {
+          const systemSource = audioContext.createMediaStreamSource(systemStream);
+          systemSource.connect(dest);
+        }
       }
 
+      await audioContext.resume()
+
       const mixedStream = dest.stream
-      const mediaRecorder = new MediaRecorder(mixedStream, { mimeType: 'audio/webm' })
+      const mediaRecorder = new MediaRecorder(mixedStream, { mimeType: 'audio/webm;codecs=opus' })
       mediaRecorderRef.current = mediaRecorder
 
       mediaRecorder.ondataavailable = (e) => {
+        console.log("Audio chunk generated, size:", e.data.size)
         if (e.data.size > 0 && ws.readyState === WebSocket.OPEN) {
           ws.send(e.data)
         }
