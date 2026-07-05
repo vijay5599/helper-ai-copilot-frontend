@@ -14,6 +14,7 @@ function createWindow() {
     alwaysOnTop: true,
     transparent: true,
     frame: false,
+    skipTaskbar: true,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
@@ -39,6 +40,10 @@ function createWindow() {
 app.whenReady().then(() => {
   if (process.platform === 'darwin') {
     systemPreferences.askForMediaAccess('microphone');
+    // Hide the app from the macOS Dock
+    if (app.dock) {
+      app.dock.hide();
+    }
   }
 
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
@@ -66,8 +71,13 @@ app.whenReady().then(() => {
 
   ipcMain.on('resize-window', (event, { height }) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      const [currentWidth] = mainWindow.getSize();
-      mainWindow.setContentSize(currentWidth, Math.ceil(height));
+      const bounds = mainWindow.getBounds();
+      mainWindow.setBounds({
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: Math.ceil(height)
+      });
     }
   });
 
