@@ -9,6 +9,8 @@ function App() {
 
   const [history, setHistory] = useState<{ question: string, answer: string }[]>([])
   const [currentIndex, setCurrentIndex] = useState(-1)
+  const [isMicActive, setIsMicActive] = useState(true)
+  const [isSystemAudioActive, setIsSystemAudioActive] = useState(true)
 
   const [showSettings, setShowSettings] = useState(false)
   const [showAnswerPanel, setShowAnswerPanel] = useState(true)
@@ -222,8 +224,53 @@ function App() {
     if (currentIndex > 0) setCurrentIndex(currentIndex - 1)
   }
 
+  const exportInterview = () => {
+    if (history.length === 0) return;
+    
+    let content = "# Interview Transcript & AI Responses\n\n";
+    history.forEach((item, index) => {
+      content += `## Q${index + 1}: ${item.question}\n\n`;
+      content += `**AI Copilot Answer:**\n${item.answer}\n\n`;
+      content += `---\n\n`;
+    });
+
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `interview_export_${new Date().toISOString().slice(0, 10)}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   const goForward = () => {
     if (currentIndex < history.length - 1) setCurrentIndex(currentIndex + 1)
+  }
+
+  const toggleMic = () => {
+    setIsMicActive(prev => {
+      const nextState = !prev;
+      if (micStreamRef.current) {
+        micStreamRef.current.getAudioTracks().forEach(track => {
+          track.enabled = nextState;
+        });
+      }
+      return nextState;
+    });
+  }
+
+  const toggleSystemAudio = () => {
+    setIsSystemAudioActive(prev => {
+      const nextState = !prev;
+      if (systemStreamRef.current) {
+        systemStreamRef.current.getAudioTracks().forEach(track => {
+          track.enabled = nextState;
+        });
+      }
+      return nextState;
+    });
   }
 
   const clearCurrentQuestion = () => {
@@ -288,10 +335,29 @@ function App() {
             <span>HelperAI</span>
           </div>
           <div className="w-[1px] h-5 bg-zinc-700 mx-1"></div>
-          <svg className="w-4 h-4 text-zinc-500" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-          </svg>
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={toggleMic} 
+              title={isMicActive ? "Mute Microphone" : "Unmute Microphone"}
+              className="[-webkit-app-region:no-drag] p-1.5 rounded-lg transition-colors bg-[#2C2C2E] hover:bg-[#3A3A3C] border border-zinc-600/50"
+            >
+              <svg className={`w-4 h-4 ${isMicActive ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse' : 'text-red-400'}`} fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+              </svg>
+            </button>
+            <button 
+              onClick={toggleSystemAudio} 
+              title={isSystemAudioActive ? "Mute System Audio" : "Unmute System Audio"}
+              className="[-webkit-app-region:no-drag] p-1.5 rounded-lg transition-colors bg-[#2C2C2E] hover:bg-[#3A3A3C] border border-zinc-600/50"
+            >
+              <svg className={`w-4 h-4 ${isSystemAudioActive ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse' : 'text-red-400'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="[-webkit-app-region:no-drag] flex items-center gap-2">
@@ -307,6 +373,10 @@ function App() {
           >
             <span>Analyze Screen</span>
           </button>
+          <button onClick={exportInterview} title="Save Interview as Markdown" className="flex items-center gap-2 bg-[#2C2C2E] hover:bg-[#3A3A3C] transition-all duration-200 border border-zinc-600/50 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white">
+            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            <span>Save</span>
+          </button>
           <button onClick={clearData} className="flex items-center gap-2 bg-[#2C2C2E] hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/50 transition-all duration-200 border border-zinc-600/50 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 group">
             <span>Clear</span>
           </button>
@@ -317,7 +387,7 @@ function App() {
             {formatTimer(timer)}
           </div>
           <button onClick={() => setShowSettings(!showSettings)} className="p-1.5 bg-[#2C2C2E] hover:bg-[#3A3A3C] border border-zinc-600/50 rounded-lg transition-colors">
-            <svg className="w-4 h-4 text-zinc-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" /></svg>
+            <svg className="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
           </button>
           <button onClick={closeApp} className="p-1.5 bg-[#2C2C2E] hover:bg-red-500/20 border border-zinc-600/50 hover:border-red-500/50 rounded-lg transition-colors">
             <svg className="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
