@@ -386,7 +386,7 @@ function App() {
                 </div>
               )
             },
-            pre: ({ node, children, ...props }: any) => <>{children}</>
+            pre: ({ children }: any) => <>{children}</>
           }}
         >
           {text}

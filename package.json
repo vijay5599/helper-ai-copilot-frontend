@@ -16,7 +16,7 @@
     "appId": "com.helperai.app",
     "productName": "HelperAI",
     "mac": {
-      "target": "dmg"
+      "target": "zip"
     },
     "win": {
       "target": "nsis"
