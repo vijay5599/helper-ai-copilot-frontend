@@ -8,6 +8,12 @@ function App() {
   const transcriptRef = useRef("Waiting for speech...")
 
   const [history, setHistory] = useState<{ question: string, answer: string }[]>([])
+  const historyRef = useRef<{ question: string, answer: string }[]>([])
+  
+  useEffect(() => {
+    historyRef.current = history
+  }, [history])
+
   const [currentIndex, setCurrentIndex] = useState(-1)
   const [isMicActive, setIsMicActive] = useState(true)
   const [isSystemAudioActive, setIsSystemAudioActive] = useState(true)
@@ -117,18 +123,38 @@ function App() {
 
   const startAudioCapture = async (ws: WebSocket) => {
     try {
-      const micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      micStreamRef.current = micStream;
+      // First get basic permission so we can read device labels
+      let micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
       
       let systemStream: MediaStream | null = null;
       try {
-        systemStream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+        systemStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
         if (videoRef.current) {
           videoRef.current.srcObject = systemStream
         }
       } catch (e) {
         console.warn("Could not get display media (screen recording permissions might be denied).", e)
       }
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const audioInputs = devices.filter(d => d.kind === 'audioinput');
+      console.log("Available audio inputs:", audioInputs.map(d => d.label));
+      
+      const blackHole = audioInputs.find(d => d.label.toLowerCase().includes('blackhole'));
+      
+      // If the default mic is BlackHole, try to find a real mic instead
+      if (blackHole && micStream.getAudioTracks()[0]?.label.toLowerCase().includes('blackhole')) {
+        const realMic = audioInputs.find(d => !d.label.toLowerCase().includes('blackhole') && d.deviceId !== 'default' && d.deviceId !== 'communications');
+        if (realMic) {
+          console.log("Default mic was BlackHole, switching to real mic:", realMic.label);
+          micStream.getTracks().forEach(t => t.stop());
+          micStream = await navigator.mediaDevices.getUserMedia({ 
+            audio: { deviceId: { exact: realMic.deviceId } } 
+          });
+        }
+      }
+
+      micStreamRef.current = micStream;
 
       const audioContext = new AudioContext()
       audioContextRef.current = audioContext;
@@ -137,13 +163,6 @@ function App() {
       const micSource = audioContext.createMediaStreamSource(micStream)
       micSource.connect(dest)
 
-      // Find BlackHole for System Audio
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const audioInputs = devices.filter(d => d.kind === 'audioinput');
-      console.log("Available audio inputs:", audioInputs.map(d => d.label));
-      
-      const blackHole = audioInputs.find(d => d.label.toLowerCase().includes('blackhole'));
-      
       if (blackHole) {
         console.log("Found BlackHole! Attempting to connect...", blackHole.label);
         try {
@@ -194,29 +213,24 @@ function App() {
 
   const triggerTextOnly = () => {
     const q = transcriptRef.current;
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'trigger_llm',
+        resume: localStorage.getItem('resume') || '',
+        jobRole: localStorage.getItem('jobRole') || '',
+        image: '',
+        history: historyRef.current
+      }))
+    }
     setHistory(prev => {
       const next = [...prev, { question: q, answer: "Generating answer..." }];
       setCurrentIndex(next.length - 1);
       return next;
     });
     setShowAnswerPanel(true)
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'trigger_llm',
-        resume: localStorage.getItem('resume') || '',
-        jobRole: localStorage.getItem('jobRole') || '',
-        image: ''
-      }))
-    }
   }
 
   const triggerScreenAnalysis = () => {
-    setHistory(prev => {
-      const next = [...prev, { question: "Analyzing screen...", answer: "Generating answer..." }];
-      setCurrentIndex(next.length - 1);
-      return next;
-    });
-    setShowAnswerPanel(true)
     let imageBase64 = ""
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current
@@ -236,9 +250,16 @@ function App() {
         type: 'trigger_llm',
         resume: localStorage.getItem('resume') || '',
         jobRole: localStorage.getItem('jobRole') || '',
-        image: imageBase64
+        image: imageBase64,
+        history: historyRef.current
       }))
     }
+    setHistory(prev => {
+      const next = [...prev, { question: "Analyzing screen...", answer: "Generating answer..." }];
+      setCurrentIndex(next.length - 1);
+      return next;
+    });
+    setShowAnswerPanel(true)
   }
 
   const closeApp = () => {
@@ -343,11 +364,29 @@ function App() {
               </li>
             ),
             p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
-            code: ({ node, inline, ...props }: any) =>
-              inline ?
-                <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-[13px] font-mono text-zinc-200" {...props} /> :
-                <code {...props} />,
-            pre: ({ node, ...props }) => <pre className="bg-zinc-800 p-3 rounded-md text-[13px] font-mono text-zinc-200 overflow-x-auto my-3" {...props} />
+            code: ({ node, inline, className, children, ...props }: any) => {
+              if (inline) {
+                return <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-[13px] font-mono text-amber-200" {...props}>{children}</code>
+              }
+              const codeText = String(children).replace(/\n$/, '')
+              return (
+                <div className="relative group my-4">
+                  <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                    <button 
+                      onClick={() => navigator.clipboard.writeText(codeText)}
+                      className="cursor-pointer p-1.5 bg-zinc-700/80 hover:bg-zinc-600 rounded text-zinc-300 hover:text-white transition-colors"
+                      title="Copy code"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    </button>
+                  </div>
+                  <pre className="bg-[#121212] p-4 rounded-lg text-[13.5px] font-mono text-emerald-400 overflow-x-auto border border-zinc-800 shadow-inner">
+                    <code {...props}>{children}</code>
+                  </pre>
+                </div>
+              )
+            },
+            pre: ({ node, children, ...props }: any) => <>{children}</>
           }}
         >
           {text}
@@ -468,7 +507,7 @@ function App() {
             </div>
             <button onClick={clearCurrentQuestion} className="hover:text-zinc-300 bg-zinc-800/30 p-1.5 rounded-md"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
           </div>
-          <div className="flex-1 overflow-y-auto pr-3 pb-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
+          <div className="flex-1 overflow-y-auto pr-3 pb-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent select-text">
             <div className="mb-6 text-[15.5px] font-medium tracking-wide text-zinc-300 leading-relaxed">
               <span className="font-bold text-zinc-100 mr-1">Question:</span> {currentItem.question}
             </div>
