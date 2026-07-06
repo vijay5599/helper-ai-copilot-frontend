@@ -38,7 +38,7 @@ function App() {
   useEffect(() => {
     if (!containerRef.current) return;
     const observer = new ResizeObserver((entries) => {
-      const isExpanded = showAnswerPanel && history.length > 0 && !showSettings;
+      const isExpanded = showAnswerPanel && history.length > 0;
       // Only auto-shrink when the panel is closed, otherwise let the user manually resize
       if (!isExpanded) {
         for (let entry of entries) {
@@ -48,15 +48,15 @@ function App() {
     });
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [showAnswerPanel, history.length, showSettings]);
+  }, [showAnswerPanel, history.length]);
 
   useEffect(() => {
-    const isExpanded = showAnswerPanel && history.length > 0 && !showSettings;
+    const isExpanded = showAnswerPanel && history.length > 0;
     if (isExpanded) {
       // Expand to a good default height when opened
       ipcRenderer.send('resize-window', { height: 600 });
     }
-  }, [showAnswerPanel, history.length, showSettings]);
+  }, [showAnswerPanel, history.length]);
 
   useEffect(() => {
     localStorage.setItem('resume', resume)
@@ -398,7 +398,7 @@ function App() {
   const currentItem = history[currentIndex];
 
   return (
-    <div ref={containerRef} className={`w-full flex flex-col font-sans select-none overflow-hidden relative text-white bg-transparent ${showAnswerPanel && currentItem && !showSettings ? 'h-screen' : 'h-auto'}`} style={{ opacity: appOpacity }}>
+    <div ref={containerRef} className={`w-full flex flex-col font-sans select-none overflow-hidden relative text-white bg-transparent ${showAnswerPanel && currentItem ? 'h-screen' : 'h-auto'}`} style={{ opacity: appOpacity }}>
       <video ref={videoRef} autoPlay playsInline muted className="hidden" />
       <canvas ref={canvasRef} className="hidden" />
 
@@ -486,18 +486,26 @@ function App() {
       </div>
 
       {showSettings && (
-        <div className="[-webkit-app-region:no-drag] mt-2 bg-[#1C1C1E]/95 backdrop-blur-3xl rounded-[16px] border border-white/10 p-5 z-10 flex flex-col gap-4">
-          <h2 className="text-zinc-100 font-bold text-base tracking-wide">Settings</h2>
-          <div className="flex flex-col gap-2">
-            <label className="text-zinc-300 text-[13px] font-semibold tracking-wide">App Opacity: {Math.round(appOpacity * 100)}%</label>
-            <input type="range" min="0.1" max="1" step="0.05" value={appOpacity} onChange={(e) => setAppOpacity(parseFloat(e.target.value))} className="accent-blue-500 cursor-pointer" />
+        <>
+          <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm [-webkit-app-region:no-drag]" onClick={() => setShowSettings(false)} />
+          <div className="[-webkit-app-region:no-drag] fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-[#1C1C1E] rounded-[16px] border border-white/10 p-6 z-50 flex flex-col gap-4 shadow-2xl">
+            <div className="flex justify-between items-center mb-1">
+              <h2 className="text-zinc-100 font-bold text-base tracking-wide">Settings</h2>
+              <button onClick={() => setShowSettings(false)} className="text-zinc-400 hover:text-white p-1 rounded-md transition-colors">
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-zinc-300 text-[13px] font-semibold tracking-wide">App Opacity: {Math.round(appOpacity * 100)}%</label>
+              <input type="range" min="0.1" max="1" step="0.05" value={appOpacity} onChange={(e) => setAppOpacity(parseFloat(e.target.value))} className="accent-blue-500 cursor-pointer" />
+            </div>
+            <input type="text" value={jobRole} onChange={(e) => setJobRole(e.target.value)} placeholder="Target Job Role" className="bg-[#09090B] border border-zinc-800 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none" />
+            <textarea value={resume} onChange={(e) => setResume(e.target.value)} placeholder="Resume Context" rows={5} className="bg-[#09090B] border border-zinc-800 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none" />
           </div>
-          <input type="text" value={jobRole} onChange={(e) => setJobRole(e.target.value)} placeholder="Target Job Role" className="bg-[#09090B] border border-zinc-800 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none" />
-          <textarea value={resume} onChange={(e) => setResume(e.target.value)} placeholder="Resume Context" rows={5} className="bg-[#09090B] border border-zinc-800 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none" />
-        </div>
+        </>
       )}
 
-      {!showSettings && currentItem && showAnswerPanel && (
+      {currentItem && showAnswerPanel && (
         <div className="[-webkit-app-region:no-drag] mt-2 bg-[#1C1C1E]/95 backdrop-blur-3xl rounded-[16px] border border-white/10 p-6 flex-1 mb-2 overflow-hidden flex flex-col">
           <div className="flex justify-between items-start mb-5">
             <div className="flex gap-3 text-zinc-500">
