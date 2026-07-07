@@ -37,12 +37,17 @@ function App() {
 
   useEffect(() => {
     if (!containerRef.current) return;
+    let lastSentHeight = 0;
     const observer = new ResizeObserver((entries) => {
       const isExpanded = showAnswerPanel && history.length > 0;
       // Only auto-shrink when the panel is closed, otherwise let the user manually resize
       if (!isExpanded) {
         for (let entry of entries) {
-          ipcRenderer.send('resize-window', { height: entry.contentRect.height });
+          const targetHeight = Math.ceil(entry.contentRect.height);
+          if (targetHeight !== lastSentHeight) {
+            lastSentHeight = targetHeight;
+            ipcRenderer.send('resize-window', { height: targetHeight });
+          }
         }
       }
     });

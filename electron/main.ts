@@ -24,6 +24,11 @@ function createWindow() {
   // Hides the window from screen capturing software (Zoom, Meet, OBS)
   mainWindow.setContentProtection(true); // Commented out temporarily for screenshots
 
+  // Hide the app from the Windows taskbar
+  if (process.platform === 'win32') {
+    mainWindow.setSkipTaskbar(true);
+  }
+
   if (process.env.VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     // Automatically open Developer Tools in dev mode
@@ -78,12 +83,15 @@ app.whenReady().then(() => {
   ipcMain.on('resize-window', (event, { height }) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       const bounds = mainWindow.getBounds();
-      mainWindow.setBounds({
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: Math.ceil(height)
-      });
+      const targetHeight = Math.ceil(height);
+      if (bounds.height !== targetHeight) {
+        mainWindow.setBounds({
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.width,
+          height: targetHeight
+        });
+      }
     }
   });
 
