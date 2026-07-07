@@ -9,7 +9,7 @@ function App() {
 
   const [history, setHistory] = useState<{ question: string, answer: string }[]>([])
   const historyRef = useRef<{ question: string, answer: string }[]>([])
-  
+
   useEffect(() => {
     historyRef.current = history
   }, [history])
@@ -124,7 +124,7 @@ function App() {
       ws.close()
       ipcRenderer.removeListener('trigger-llm', handleTrigger)
       mediaRecorderRef.current?.stop()
-      
+
       micStreamRef.current?.getTracks().forEach(t => t.stop())
       systemStreamRef.current?.getTracks().forEach(t => t.stop())
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
@@ -137,31 +137,32 @@ function App() {
     try {
       // First get basic permission so we can read device labels
       let micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      
-      let systemStream: MediaStream | null = null;
-      try {
-        systemStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
-        if (videoRef.current) {
-          videoRef.current.srcObject = systemStream
-        }
-      } catch (e) {
-        console.warn("Could not get display media (screen recording permissions might be denied).", e)
-      }
+
+      let systemStream: MediaStream | null = null as MediaStream | null;
+      // DISABLED TO PREVENT SCREEN LAG
+      // try {
+      //   systemStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
+      //   if (videoRef.current) {
+      //     videoRef.current.srcObject = systemStream
+      //   }
+      // } catch (e) {
+      //   console.warn("Could not get display media (screen recording permissions might be denied).", e)
+      // }
 
       const devices = await navigator.mediaDevices.enumerateDevices();
       const audioInputs = devices.filter(d => d.kind === 'audioinput');
       console.log("Available audio inputs:", audioInputs.map(d => d.label));
-      
+
       const blackHole = audioInputs.find(d => d.label.toLowerCase().includes('blackhole'));
-      
+
       // If the default mic is BlackHole, try to find a real mic instead
       if (blackHole && micStream.getAudioTracks()[0]?.label.toLowerCase().includes('blackhole')) {
         const realMic = audioInputs.find(d => !d.label.toLowerCase().includes('blackhole') && d.deviceId !== 'default' && d.deviceId !== 'communications');
         if (realMic) {
           console.log("Default mic was BlackHole, switching to real mic:", realMic.label);
           micStream.getTracks().forEach(t => t.stop());
-          micStream = await navigator.mediaDevices.getUserMedia({ 
-            audio: { deviceId: { exact: realMic.deviceId } } 
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: { deviceId: { exact: realMic.deviceId } }
           });
         }
       }
@@ -178,19 +179,19 @@ function App() {
       if (blackHole) {
         console.log("Found BlackHole! Attempting to connect...", blackHole.label);
         try {
-          const bhStream = await navigator.mediaDevices.getUserMedia({ 
-            audio: { 
+          const bhStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
               deviceId: { exact: blackHole.deviceId },
               echoCancellation: false,
               noiseSuppression: false,
               autoGainControl: false
-            } 
+            }
           });
           systemStreamRef.current = bhStream;
           const systemSource = audioContext.createMediaStreamSource(bhStream);
           systemSource.connect(dest);
           console.log("Successfully connected BlackHole for System Audio");
-        } catch(e) {
+        } catch (e) {
           console.error("Failed to connect BlackHole", e);
         }
       } else if (systemStream) {
@@ -241,7 +242,8 @@ function App() {
     });
     setShowAnswerPanel(true)
   }
-
+  // triggerScreenAnalysis temporarily removed
+  /*
   const triggerScreenAnalysis = () => {
     let imageBase64 = ""
     if (videoRef.current && canvasRef.current) {
@@ -273,6 +275,7 @@ function App() {
     });
     setShowAnswerPanel(true)
   }
+  */
 
   const closeApp = () => {
     window.close()
@@ -294,7 +297,7 @@ function App() {
 
   const exportInterview = () => {
     if (history.length === 0) return;
-    
+
     let content = "# Interview Transcript & AI Responses\n\n";
     history.forEach((item, index) => {
       content += `## Q${index + 1}: ${item.question}\n\n`;
@@ -384,7 +387,7 @@ function App() {
               return (
                 <div className="relative group my-4">
                   <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                    <button 
+                    <button
                       onClick={() => navigator.clipboard.writeText(codeText)}
                       className="cursor-pointer p-1.5 bg-zinc-700/80 hover:bg-zinc-600 rounded text-zinc-300 hover:text-white transition-colors"
                       title="Copy code"
@@ -422,8 +425,8 @@ function App() {
           </div>
           <div className="w-[1px] h-5 bg-zinc-700 mx-1"></div>
           <div className="flex items-center gap-1">
-            <button 
-              onClick={toggleMic} 
+            <button
+              onClick={toggleMic}
               title={isMicActive ? "Mute Microphone" : "Unmute Microphone"}
               className="[-webkit-app-region:no-drag] p-1.5 rounded-lg transition-colors bg-[#2C2C2E] hover:bg-[#3A3A3C] border border-zinc-600/50"
             >
@@ -432,8 +435,8 @@ function App() {
                 <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
               </svg>
             </button>
-            <button 
-              onClick={toggleSystemAudio} 
+            <button
+              onClick={toggleSystemAudio}
               title={isSystemAudioActive ? "Mute System Audio" : "Unmute System Audio"}
               className="[-webkit-app-region:no-drag] p-1.5 rounded-lg transition-colors bg-[#2C2C2E] hover:bg-[#3A3A3C] border border-zinc-600/50"
             >
@@ -453,12 +456,14 @@ function App() {
           >
             <span>AI Help</span>
           </button>
+          {/* Analyze Screen button temporarily removed to prevent lag
           <button
             onClick={triggerScreenAnalysis}
             className="flex items-center gap-2 bg-[#2C2C2E] hover:bg-[#3A3A3C] transition-all duration-200 border border-zinc-600/50 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white"
           >
             <span>Analyze Screen</span>
           </button>
+          */}
           <button onClick={exportInterview} title="Save Interview as Markdown" className="flex items-center gap-2 bg-[#2C2C2E] hover:bg-[#3A3A3C] transition-all duration-200 border border-zinc-600/50 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>Save</span>
