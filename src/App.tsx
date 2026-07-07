@@ -39,8 +39,8 @@ function App() {
     if (!containerRef.current) return;
     let lastSentHeight = 0;
     const observer = new ResizeObserver((entries) => {
-      const isExpanded = showAnswerPanel && history.length > 0;
-      // Only auto-shrink when the panel is closed, otherwise let the user manually resize
+      const isExpanded = (showAnswerPanel && history.length > 0) || showSettings;
+      // Only auto-shrink when the panel is closed and settings is closed, otherwise let the user manually resize
       if (!isExpanded) {
         for (let entry of entries) {
           const targetHeight = Math.ceil(entry.contentRect.height);
@@ -53,15 +53,22 @@ function App() {
     });
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [showAnswerPanel, history.length]);
+  }, [showAnswerPanel, history.length, showSettings]);
 
   useEffect(() => {
-    const isExpanded = showAnswerPanel && history.length > 0;
+    const isExpanded = (showAnswerPanel && history.length > 0) || showSettings;
     if (isExpanded) {
       // Expand to a good default height when opened
-      ipcRenderer.send('resize-window', { height: 600 });
+      const targetHeight = (showAnswerPanel && history.length > 0) ? 900 : 500;
+      ipcRenderer.send('resize-window', { height: targetHeight });
+    } else {
+      // When collapsing, immediately resize to the toolbar content height
+      if (containerRef.current) {
+        const contentHeight = Math.ceil(containerRef.current.getBoundingClientRect().height);
+        ipcRenderer.send('resize-window', { height: contentHeight });
+      }
     }
-  }, [showAnswerPanel, history.length]);
+  }, [showAnswerPanel, history.length, showSettings]);
 
   useEffect(() => {
     localStorage.setItem('resume', resume)

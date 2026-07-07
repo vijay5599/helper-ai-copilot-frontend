@@ -10,7 +10,7 @@ let mainWindow: BrowserWindow | null = null;
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 800,
-    height: 600,
+    height: 900,
     alwaysOnTop: true,
     transparent: true,
     frame: false,
@@ -22,7 +22,7 @@ function createWindow() {
   });
 
   // Hides the window from screen capturing software (Zoom, Meet, OBS)
-  mainWindow.setContentProtection(true); // Commented out temporarily for screenshots
+  // mainWindow.setContentProtection(true); // Commented out temporarily for screenshots
 
   // Hide the app from the Windows taskbar
   if (process.platform === 'win32') {
