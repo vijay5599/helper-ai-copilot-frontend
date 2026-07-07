@@ -1,4 +1,4 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, session, systemPreferences, desktopCapturer } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, session, systemPreferences, desktopCapturer, screen } from 'electron';
 import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
 
@@ -8,9 +8,13 @@ const __dirname = dirname(__filename);
 let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const maxAllowedHeight = Math.floor(primaryDisplay.workAreaSize.height * 0.85);
+  const initialHeight = Math.min(900, maxAllowedHeight);
+
   mainWindow = new BrowserWindow({
     width: 800,
-    height: 900,
+    height: initialHeight,
     alwaysOnTop: true,
     transparent: true,
     frame: false,
@@ -83,7 +87,10 @@ app.whenReady().then(() => {
   ipcMain.on('resize-window', (event, { height }) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       const bounds = mainWindow.getBounds();
-      const targetHeight = Math.ceil(height);
+      const currentDisplay = screen.getDisplayMatching(bounds);
+      const maxAllowedHeight = Math.floor(currentDisplay.workAreaSize.height * 0.85);
+      const targetHeight = Math.min(Math.ceil(height), maxAllowedHeight);
+
       if (bounds.height !== targetHeight) {
         mainWindow.setBounds({
           x: bounds.x,

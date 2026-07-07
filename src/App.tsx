@@ -500,7 +500,7 @@ function App() {
       {showSettings && (
         <>
           <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm [-webkit-app-region:no-drag]" onClick={() => setShowSettings(false)} />
-          <div className="[-webkit-app-region:no-drag] fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-[#1C1C1E] rounded-[16px] border border-white/10 p-6 z-50 flex flex-col gap-4 shadow-2xl">
+          <div className="[-webkit-app-region:no-drag] fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md max-h-[90vh] overflow-y-auto bg-[#1C1C1E] rounded-[16px] border border-white/10 p-6 z-50 flex flex-col gap-4 shadow-2xl">
             <div className="flex justify-between items-center mb-1">
               <h2 className="text-zinc-100 font-bold text-base tracking-wide">Settings</h2>
               <button onClick={() => setShowSettings(false)} className="text-zinc-400 hover:text-white p-1 rounded-md transition-colors">
