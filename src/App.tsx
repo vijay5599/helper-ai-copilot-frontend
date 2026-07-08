@@ -17,6 +17,11 @@ function App() {
   const [currentIndex, setCurrentIndex] = useState(-1)
   const [isMicActive, setIsMicActive] = useState(true)
   const [isSystemAudioActive, setIsSystemAudioActive] = useState(true)
+  const [analyzeScreen, setAnalyzeScreen] = useState(false)
+  const analyzeScreenRef = useRef(false)
+  useEffect(() => {
+    analyzeScreenRef.current = analyzeScreen
+  }, [analyzeScreen])
 
   const [showSettings, setShowSettings] = useState(false)
   const [showAnswerPanel, setShowAnswerPanel] = useState(true)
@@ -139,15 +144,18 @@ function App() {
       let micStream = await navigator.mediaDevices.getUserMedia({ audio: true })
 
       let systemStream: MediaStream | null = null as MediaStream | null;
-      // DISABLED TO PREVENT SCREEN LAG
-      // try {
-      //   systemStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true })
-      //   if (videoRef.current) {
-      //     videoRef.current.srcObject = systemStream
-      //   }
-      // } catch (e) {
-      //   console.warn("Could not get display media (screen recording permissions might be denied).", e)
-      // }
+      try {
+        // Limited framerate to 5-10fps to completely eliminate the screen lag issue
+        systemStream = await navigator.mediaDevices.getDisplayMedia({
+          video: { frameRate: { ideal: 5, max: 10 } },
+          audio: true
+        })
+        if (videoRef.current) {
+          videoRef.current.srcObject = systemStream
+        }
+      } catch (e) {
+        console.warn("Could not get display media (screen recording permissions might be denied).", e)
+      }
 
       const devices = await navigator.mediaDevices.enumerateDevices();
       const audioInputs = devices.filter(d => d.kind === 'audioinput');
@@ -226,17 +234,33 @@ function App() {
 
   const triggerTextOnly = () => {
     const q = transcriptRef.current;
+
+    let imageBase64 = ""
+    if (analyzeScreenRef.current && videoRef.current && canvasRef.current) {
+      const video = videoRef.current
+      const canvas = canvasRef.current
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        canvas.width = video.videoWidth
+        canvas.height = video.videoHeight
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+          imageBase64 = canvas.toDataURL('image/jpeg', 0.7)
+        }
+      }
+    }
+
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'trigger_llm',
         resume: localStorage.getItem('resume') || '',
         jobRole: localStorage.getItem('jobRole') || '',
-        image: '',
+        image: imageBase64,
         history: historyRef.current
       }))
     }
     setHistory(prev => {
-      const next = [...prev, { question: q, answer: "Generating answer..." }];
+      const next = [...prev, { question: imageBase64 ? "Analyzing screen..." : q, answer: "Generating answer..." }];
       setCurrentIndex(next.length - 1);
       return next;
     });
@@ -380,10 +404,14 @@ function App() {
             ),
             p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
             code: ({ node, inline, className, children, ...props }: any) => {
-              if (inline) {
-                return <code className="bg-zinc-800 px-1.5 py-0.5 rounded text-[13px] font-mono text-amber-200" {...props}>{children}</code>
-              }
               const codeText = String(children).replace(/\n$/, '')
+              // Catch arrays like "[3, 3]" or other short snippets that have spaces but are clearly meant to be inline
+              const isShortSnippet = !codeText.includes('\n') && codeText.length < 60 && !className
+              
+              if (inline || isShortSnippet) {
+                // Render inline variables as bold text instead of distracting code blocks
+                return <strong className="text-emerald-400 font-bold" {...props}>{children}</strong>
+              }
               return (
                 <div className="relative group my-4">
                   <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
@@ -456,14 +484,17 @@ function App() {
           >
             <span>AI Help</span>
           </button>
-          {/* Analyze Screen button temporarily removed to prevent lag
-          <button
-            onClick={triggerScreenAnalysis}
-            className="flex items-center gap-2 bg-[#2C2C2E] hover:bg-[#3A3A3C] transition-all duration-200 border border-zinc-600/50 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white"
-          >
-            <span>Analyze Screen</span>
-          </button>
-          */}
+
+          <label className="flex items-center gap-2 bg-[#2C2C2E] border border-zinc-600/50 shadow-sm rounded-full px-3 py-1.5 text-[12px] font-semibold tracking-wide text-zinc-300 cursor-pointer hover:bg-[#3A3A3C] transition-colors">
+            <input
+              type="checkbox"
+              checked={analyzeScreen}
+              onChange={(e) => setAnalyzeScreen(e.target.checked)}
+              className="rounded bg-[#1C1C1E] border-zinc-600 text-blue-500 focus:ring-blue-500/50 focus:ring-offset-0 focus:ring-1"
+            />
+            <span>+ Screen</span>
+          </label>
+
           <button onClick={exportInterview} title="Save Interview as Markdown" className="flex items-center gap-2 bg-[#2C2C2E] hover:bg-[#3A3A3C] transition-all duration-200 border border-zinc-600/50 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             <span>Save</span>
