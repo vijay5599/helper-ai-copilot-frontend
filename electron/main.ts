@@ -10,7 +10,8 @@ let mainWindow: BrowserWindow | null = null;
 function createWindow() {
   const primaryDisplay = screen.getPrimaryDisplay();
   const maxAllowedHeight = Math.floor(primaryDisplay.workAreaSize.height * 0.85);
-  const initialHeight = Math.min(900, maxAllowedHeight);
+  // Set to a compact height (400px) so the app stays discreet
+  const initialHeight = Math.min(400, 800);
 
   mainWindow = new BrowserWindow({
     width: 800,
@@ -48,6 +49,18 @@ function createWindow() {
     mainWindow = null;
   });
 }
+
+ipcMain.on('resize-window', (event, height) => {
+  if (mainWindow) {
+    const bounds = mainWindow.getBounds();
+    mainWindow.setBounds({
+      x: bounds.x,
+      y: bounds.y,
+      width: bounds.width,
+      height: Math.ceil(height)
+    });
+  }
+});
 
 app.whenReady().then(() => {
   app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');

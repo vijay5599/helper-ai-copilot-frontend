@@ -23,6 +23,25 @@ function App() {
     analyzeScreenRef.current = analyzeScreen
   }, [analyzeScreen])
 
+  // Dynamically resize the Electron window to match the React app height, removing invisible boundaries
+  useEffect(() => {
+    const root = document.getElementById('app-container');
+    if (!root) return;
+    
+    const observer = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        // Measure exact height of the UI elements
+        const height = Math.ceil(entry.target.getBoundingClientRect().height);
+        // Use native window API which Electron intercepts, automatically shrinking the physical window
+        window.resizeTo(800, height);
+      }
+    });
+    
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [])
+
+
   const [showSettings, setShowSettings] = useState(false)
   const [showAnswerPanel, setShowAnswerPanel] = useState(true)
   const [resume, setResume] = useState(() => localStorage.getItem('resume') || '')
@@ -40,40 +59,7 @@ function App() {
   const micStreamRef = useRef<MediaStream | null>(null)
   const systemStreamRef = useRef<MediaStream | null>(null)
 
-  useEffect(() => {
-    if (!containerRef.current) return;
-    let lastSentHeight = 0;
-    const observer = new ResizeObserver((entries) => {
-      const isExpanded = (showAnswerPanel && history.length > 0) || showSettings;
-      // Only auto-shrink when the panel is closed and settings is closed, otherwise let the user manually resize
-      if (!isExpanded) {
-        for (let entry of entries) {
-          const targetHeight = Math.ceil(entry.contentRect.height);
-          if (targetHeight !== lastSentHeight) {
-            lastSentHeight = targetHeight;
-            ipcRenderer.send('resize-window', { height: targetHeight });
-          }
-        }
-      }
-    });
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [showAnswerPanel, history.length, showSettings]);
 
-  useEffect(() => {
-    const isExpanded = (showAnswerPanel && history.length > 0) || showSettings;
-    if (isExpanded) {
-      // Expand to a good default height when opened
-      const targetHeight = (showAnswerPanel && history.length > 0) ? 900 : 500;
-      ipcRenderer.send('resize-window', { height: targetHeight });
-    } else {
-      // When collapsing, immediately resize to the toolbar content height
-      if (containerRef.current) {
-        const contentHeight = Math.ceil(containerRef.current.getBoundingClientRect().height);
-        ipcRenderer.send('resize-window', { height: contentHeight });
-      }
-    }
-  }, [showAnswerPanel, history.length, showSettings]);
 
   useEffect(() => {
     localStorage.setItem('resume', resume)
@@ -441,7 +427,7 @@ function App() {
   const currentItem = history[currentIndex];
 
   return (
-    <div ref={containerRef} className={`w-full flex flex-col font-sans select-none overflow-hidden relative text-white bg-transparent ${showAnswerPanel && currentItem ? 'h-screen' : 'h-auto'}`} style={{ opacity: appOpacity }}>
+    <div id="app-container" ref={containerRef} className={`w-full flex flex-col font-sans select-none overflow-hidden relative text-white bg-transparent h-auto`} style={{ opacity: appOpacity }}>
       <video ref={videoRef} autoPlay playsInline muted className="hidden" />
       <canvas ref={canvasRef} className="hidden" />
 
@@ -554,7 +540,7 @@ function App() {
       )}
 
       {currentItem && showAnswerPanel && (
-        <div className="[-webkit-app-region:no-drag] mt-2 bg-[#1C1C1E]/95 backdrop-blur-3xl rounded-[16px] border border-white/10 p-6 flex-1 mb-2 overflow-hidden flex flex-col">
+        <div className="[-webkit-app-region:no-drag] mt-2 bg-[#1C1C1E]/95 backdrop-blur-3xl rounded-[16px] border border-white/10 p-6 mb-2 overflow-hidden flex flex-col resize-y min-h-[150px] max-h-[80vh]">
           <div className="flex justify-between items-start mb-5">
             <div className="flex gap-3 text-zinc-500">
               <button onClick={goBack} disabled={currentIndex <= 0} className="hover:text-zinc-300 disabled:opacity-30 bg-zinc-800/30 p-1.5 rounded-md"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
