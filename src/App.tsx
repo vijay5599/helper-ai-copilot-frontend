@@ -407,7 +407,7 @@ function App() {
               const codeText = String(children).replace(/\n$/, '')
               // Catch arrays like "[3, 3]" or other short snippets that have spaces but are clearly meant to be inline
               const isShortSnippet = !codeText.includes('\n') && codeText.length < 60 && !className
-              
+
               if (inline || isShortSnippet) {
                 // Render inline variables as bold text instead of distracting code blocks
                 return <strong className="text-emerald-400 font-bold" {...props}>{children}</strong>
