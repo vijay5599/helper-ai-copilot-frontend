@@ -8,9 +8,7 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
-button, [role="button"], input[type="range"] {
-  cursor: pointer;
-}
+
 
 button:disabled, [role="button"]:disabled {
   cursor: not-allowed;

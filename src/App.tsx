@@ -389,7 +389,7 @@ function App() {
                   <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                     <button
                       onClick={() => navigator.clipboard.writeText(codeText)}
-                      className="cursor-pointer p-1.5 bg-zinc-700/80 hover:bg-zinc-600 rounded text-zinc-300 hover:text-white transition-colors"
+                      className="p-1.5 bg-zinc-700/80 hover:bg-zinc-600 rounded text-zinc-300 hover:text-white transition-colors"
                       title="Copy code"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
@@ -489,14 +489,14 @@ function App() {
       <div className="[-webkit-app-region:no-drag] mt-2 bg-[#1C1C1E] rounded-[16px] border border-white/10 px-4 py-2.5 flex justify-between items-center text-[13px] text-zinc-300 font-medium tracking-wide backdrop-blur-2xl">
         <div className="truncate pr-4 flex-1 text-wrap">{transcript || "Waiting for transcript..."}</div>
         <div className="flex items-center gap-2 opacity-40">
-          <button onClick={() => setShowAnswerPanel(!showAnswerPanel)} className="hover:opacity-100 cursor-pointer p-0.5">
+          <button onClick={() => setShowAnswerPanel(!showAnswerPanel)} className="hover:opacity-100 p-0.5">
             {showAnswerPanel ? (
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
             ) : (
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
             )}
           </button>
-          <button onClick={clearData} className="hover:opacity-100 cursor-pointer p-0.5">
+          <button onClick={clearData} className="hover:opacity-100 p-0.5">
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
@@ -514,7 +514,7 @@ function App() {
             </div>
             <div className="flex flex-col gap-2">
               <label className="text-zinc-300 text-[13px] font-semibold tracking-wide">App Opacity: {Math.round(appOpacity * 100)}%</label>
-              <input type="range" min="0.1" max="1" step="0.05" value={appOpacity} onChange={(e) => setAppOpacity(parseFloat(e.target.value))} className="accent-blue-500 cursor-pointer" />
+              <input type="range" min="0.1" max="1" step="0.05" value={appOpacity} onChange={(e) => setAppOpacity(parseFloat(e.target.value))} className="accent-blue-500" />
             </div>
             <input type="text" value={jobRole} onChange={(e) => setJobRole(e.target.value)} placeholder="Target Job Role" className="bg-[#09090B] border border-zinc-800 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none" />
             <textarea value={resume} onChange={(e) => setResume(e.target.value)} placeholder="Resume Context" rows={5} className="bg-[#09090B] border border-zinc-800 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none" />
