@@ -3,6 +3,25 @@ import ReactMarkdown from 'react-markdown'
 
 const { ipcRenderer } = (window as any).require('electron')
 
+const TimerDisplay = () => {
+  const [timer, setTimer] = useState(0)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimer(t => t + 1)
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  const formatTimer = (secs: number) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, '0')
+    const s = (secs % 60).toString().padStart(2, '0')
+    return `${m}:${s}`
+  }
+
+  return <>{formatTimer(timer)}</>
+}
+
 function App() {
   const [transcript, setTranscript] = useState("Waiting for speech...")
   const transcriptRef = useRef("Waiting for speech...")
@@ -23,22 +42,35 @@ function App() {
     analyzeScreenRef.current = analyzeScreen
   }, [analyzeScreen])
 
-  // Dynamically resize the Electron window to match the React app height, removing invisible boundaries
+  // Dynamically resize the Electron window to match the React app height
   useEffect(() => {
     const root = document.getElementById('app-container');
     if (!root) return;
-    
+
+    let lastHeight = 0;
+    let throttleTimeout: any = null;
+
     const observer = new ResizeObserver((entries) => {
       for (let entry of entries) {
-        // Measure exact height of the UI elements
         const height = Math.ceil(entry.target.getBoundingClientRect().height);
-        // Use native window API which Electron intercepts, automatically shrinking the physical window
-        window.resizeTo(800, height);
+        if (height === lastHeight) continue;
+
+        // Throttle the OS-level window resize to prevent drag lag
+        if (!throttleTimeout) {
+          throttleTimeout = setTimeout(() => {
+            window.resizeTo(800, height);
+            lastHeight = height;
+            throttleTimeout = null;
+          }, 40); // 40ms throttle (~25 FPS) keeps it smooth without lagging the OS
+        }
       }
     });
-    
+
     observer.observe(root);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (throttleTimeout) clearTimeout(throttleTimeout);
+    };
   }, [])
 
 
@@ -47,12 +79,12 @@ function App() {
   const [resume, setResume] = useState(() => localStorage.getItem('resume') || '')
   const [jobRole, setJobRole] = useState(() => localStorage.getItem('jobRole') || '')
   const [appOpacity, setAppOpacity] = useState(() => parseFloat(localStorage.getItem('appOpacity') || '0.95'))
-  const [timer, setTimer] = useState(0)
 
   const wsRef = useRef<WebSocket | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   const audioContextRef = useRef<AudioContext | null>(null)
@@ -66,19 +98,6 @@ function App() {
     localStorage.setItem('jobRole', jobRole)
     localStorage.setItem('appOpacity', appOpacity.toString())
   }, [resume, jobRole, appOpacity])
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTimer(t => t + 1)
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [])
-
-  const formatTimer = (secs: number) => {
-    const m = Math.floor(secs / 60).toString().padStart(2, '0')
-    const s = (secs % 60).toString().padStart(2, '0')
-    return `${m}:${s}`
-  }
 
   useEffect(() => {
     const backendUrl = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
@@ -431,90 +450,89 @@ function App() {
       <video ref={videoRef} autoPlay playsInline muted className="hidden" />
       <canvas ref={canvasRef} className="hidden" />
 
-      <div className="[-webkit-app-region:drag] mt-2 bg-[#1C1C1E] rounded-[16px] border border-white/10 flex items-center justify-between p-2 px-3 backdrop-blur-2xl">
-        <div className="flex items-center gap-3 pl-1">
-          <div className="flex items-center gap-2 font-bold text-[15px] tracking-wide text-zinc-100">
-            <span className="text-xl">🧑‍💻</span>
-            <span>HelperAI</span>
+      <div className="[-webkit-app-region:no-drag] mt-2 mb-2 rounded-[16px] bg-gradient-to-br from-indigo-500/20 via-purple-500/10 to-transparent p-[1px] drop-shadow-2xl">
+        <div className="[-webkit-app-region:drag] bg-[#13141c] rounded-[15px] flex items-center justify-between p-2 px-3 backdrop-blur-2xl">
+          <div className="flex items-center gap-3 pl-1">
+            <div className="flex items-center gap-2 font-bold text-[15px] tracking-wide text-zinc-100">
+              <span className="text-xl">🧑‍💻</span>
+              <span>HelperAI</span>
+            </div>
+            <div className="w-[1px] h-5 bg-zinc-700/50 mx-1"></div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggleMic}
+                title={isMicActive ? "Mute Microphone" : "Unmute Microphone"}
+                className="[-webkit-app-region:no-drag] p-1.5 rounded-lg transition-colors bg-[#1e1f2e] hover:bg-[#2a2b3d] border border-indigo-500/10"
+              >
+                <svg className={`w-4 h-4 ${isMicActive ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse' : 'text-red-400'}`} fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+                </svg>
+              </button>
+              <button
+                onClick={toggleSystemAudio}
+                title={isSystemAudioActive ? "Mute System Audio" : "Unmute System Audio"}
+                className="[-webkit-app-region:no-drag] p-1.5 rounded-lg transition-colors bg-[#1e1f2e] hover:bg-[#2a2b3d] border border-indigo-500/10"
+              >
+                <svg className={`w-4 h-4 ${isSystemAudioActive ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse' : 'text-red-400'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                  <line x1="8" y1="21" x2="16" y2="21"></line>
+                  <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+              </button>
+            </div>
           </div>
-          <div className="w-[1px] h-5 bg-zinc-700 mx-1"></div>
-          <div className="flex items-center gap-1">
+
+          <div className="[-webkit-app-region:no-drag] flex items-center gap-2">
             <button
-              onClick={toggleMic}
-              title={isMicActive ? "Mute Microphone" : "Unmute Microphone"}
-              className="[-webkit-app-region:no-drag] p-1.5 rounded-lg transition-colors bg-[#2C2C2E] hover:bg-[#3A3A3C] border border-zinc-600/50"
+              onClick={triggerTextOnly}
+              className="flex items-center gap-2 bg-[#1e1f2e] hover:bg-[#2a2b3d] transition-all duration-200 border border-indigo-500/20 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white"
             >
-              <svg className={`w-4 h-4 ${isMicActive ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse' : 'text-red-400'}`} fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-              </svg>
+              <span>AI Help</span>
             </button>
-            <button
-              onClick={toggleSystemAudio}
-              title={isSystemAudioActive ? "Mute System Audio" : "Unmute System Audio"}
-              className="[-webkit-app-region:no-drag] p-1.5 rounded-lg transition-colors bg-[#2C2C2E] hover:bg-[#3A3A3C] border border-zinc-600/50"
-            >
-              <svg className={`w-4 h-4 ${isSystemAudioActive ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse' : 'text-red-400'}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                <line x1="8" y1="21" x2="16" y2="21"></line>
-                <line x1="12" y1="17" x2="12" y2="21"></line>
-              </svg>
+
+            <label className="flex items-center gap-2 bg-[#1e1f2e] border border-indigo-500/20 shadow-sm rounded-full px-3 py-1.5 text-[12px] font-semibold tracking-wide text-zinc-300 cursor-pointer hover:bg-[#2a2b3d] transition-colors">
+              <input
+                type="checkbox"
+                checked={analyzeScreen}
+                onChange={(e) => setAnalyzeScreen(e.target.checked)}
+                className="rounded bg-[#13141c] border-zinc-600 text-indigo-500 focus:ring-indigo-500/50 focus:ring-offset-0 focus:ring-1"
+              />
+              <span>+ Screen</span>
+            </label>
+
+            <button onClick={exportInterview} title="Save Interview as Markdown" className="flex items-center gap-2 bg-[#1e1f2e] hover:bg-[#2a2b3d] transition-all duration-200 border border-indigo-500/20 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white">
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Save</span>
+            </button>
+            <button onClick={clearData} className="flex items-center gap-2 bg-[#1e1f2e] hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/50 transition-all duration-200 border border-indigo-500/20 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 group">
+              <span>Clear</span>
             </button>
           </div>
-        </div>
 
-        <div className="[-webkit-app-region:no-drag] flex items-center gap-2">
-          <button
-            onClick={triggerTextOnly}
-            className="flex items-center gap-2 bg-[#2C2C2E] hover:bg-[#3A3A3C] transition-all duration-200 border border-zinc-600/50 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white"
-          >
-            <span>AI Help</span>
-          </button>
-
-          <label className="flex items-center gap-2 bg-[#2C2C2E] border border-zinc-600/50 shadow-sm rounded-full px-3 py-1.5 text-[12px] font-semibold tracking-wide text-zinc-300 cursor-pointer hover:bg-[#3A3A3C] transition-colors">
-            <input
-              type="checkbox"
-              checked={analyzeScreen}
-              onChange={(e) => setAnalyzeScreen(e.target.checked)}
-              className="rounded bg-[#1C1C1E] border-zinc-600 text-blue-500 focus:ring-blue-500/50 focus:ring-offset-0 focus:ring-1"
-            />
-            <span>+ Screen</span>
-          </label>
-
-          <button onClick={exportInterview} title="Save Interview as Markdown" className="flex items-center gap-2 bg-[#2C2C2E] hover:bg-[#3A3A3C] transition-all duration-200 border border-zinc-600/50 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            <span>Save</span>
-          </button>
-          <button onClick={clearData} className="flex items-center gap-2 bg-[#2C2C2E] hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/50 transition-all duration-200 border border-zinc-600/50 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 group">
-            <span>Clear</span>
-          </button>
-        </div>
-
-        <div className="[-webkit-app-region:no-drag] flex items-center gap-1.5 pr-1">
-          <div className="flex items-center gap-2 bg-[#2C2C2E] border border-zinc-600/50 rounded-lg px-2.5 py-1 text-[13px] font-mono tracking-wider font-semibold text-zinc-300">
-            {formatTimer(timer)}
+          <div className="[-webkit-app-region:no-drag] flex items-center gap-1.5 pr-1">
+            <div className="flex items-center gap-2 bg-[#1e1f2e] border border-indigo-500/20 rounded-lg px-2.5 py-1 text-[13px] font-mono tracking-wider font-semibold text-zinc-300">
+              <TimerDisplay />
+            </div>
+            <button onClick={() => setShowSettings(!showSettings)} className="p-1.5 bg-[#1e1f2e] hover:bg-[#2a2b3d] border border-indigo-500/20 rounded-lg transition-colors">
+              <svg className="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </button>
+            <button onClick={closeApp} className="p-1.5 bg-[#1e1f2e] hover:bg-red-500/20 border border-indigo-500/20 hover:border-red-500/50 rounded-lg transition-colors">
+              <svg className="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
           </div>
-          <button onClick={() => setShowSettings(!showSettings)} className="p-1.5 bg-[#2C2C2E] hover:bg-[#3A3A3C] border border-zinc-600/50 rounded-lg transition-colors">
-            <svg className="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-          </button>
-          <button onClick={closeApp} className="p-1.5 bg-[#2C2C2E] hover:bg-red-500/20 border border-zinc-600/50 hover:border-red-500/50 rounded-lg transition-colors">
-            <svg className="w-4 h-4 text-zinc-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
         </div>
       </div>
-
-      <div className="[-webkit-app-region:no-drag] mt-2 bg-[#1C1C1E] rounded-[16px] border border-white/10 px-4 py-2.5 flex justify-between items-center text-[13px] text-zinc-300 font-medium tracking-wide backdrop-blur-2xl">
-        <div className="truncate pr-4 flex-1 text-wrap">{transcript || "Waiting for transcript..."}</div>
-        <div className="flex items-center gap-2 opacity-40">
-          <button onClick={() => setShowAnswerPanel(!showAnswerPanel)} className="hover:opacity-100 p-0.5">
+            <div className="[-webkit-app-region:no-drag] mt-2 mb-2 rounded-[16px] bg-gradient-to-br from-indigo-500/20 via-purple-500/10 to-transparent p-[1px] drop-shadow-2xl">
+        <div className="bg-[#13141c] rounded-[15px] px-4 py-2.5 flex justify-between items-center text-[13px] text-zinc-300 font-medium tracking-wide backdrop-blur-2xl">
+          <div className="truncate pr-4 flex-1 text-wrap">{transcript || "Waiting for transcript..."}</div>
+          <button onClick={() => setShowAnswerPanel(!showAnswerPanel)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1e1f2e] hover:bg-[#2a2b3d] border border-indigo-500/10 text-zinc-300 transition-colors shadow-sm whitespace-nowrap group">
+            <span className="font-semibold text-[12px]">{showAnswerPanel ? "Hide Answer" : "Show Answer"}</span>
             {showAnswerPanel ? (
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
+              <svg className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
             ) : (
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              <svg className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
             )}
-          </button>
-          <button onClick={clearData} className="hover:opacity-100 p-0.5">
-            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
         </div>
       </div>
@@ -522,7 +540,7 @@ function App() {
       {showSettings && (
         <>
           <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm [-webkit-app-region:no-drag]" onClick={() => setShowSettings(false)} />
-          <div className="[-webkit-app-region:no-drag] fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md max-h-[90vh] overflow-y-auto bg-[#1C1C1E] rounded-[16px] border border-white/10 p-6 z-50 flex flex-col gap-4 shadow-2xl">
+          <div className="[-webkit-app-region:no-drag] fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md max-h-[90vh] overflow-y-auto bg-[#13141c] rounded-[16px] border border-indigo-500/20 p-6 z-50 flex flex-col gap-4 shadow-2xl">
             <div className="flex justify-between items-center mb-1">
               <h2 className="text-zinc-100 font-bold text-base tracking-wide">Settings</h2>
               <button onClick={() => setShowSettings(false)} className="text-zinc-400 hover:text-white p-1 rounded-md transition-colors">
@@ -531,31 +549,62 @@ function App() {
             </div>
             <div className="flex flex-col gap-2">
               <label className="text-zinc-300 text-[13px] font-semibold tracking-wide">App Opacity: {Math.round(appOpacity * 100)}%</label>
-              <input type="range" min="0.1" max="1" step="0.05" value={appOpacity} onChange={(e) => setAppOpacity(parseFloat(e.target.value))} className="accent-blue-500" />
+              <input type="range" min="0.1" max="1" step="0.05" value={appOpacity} onChange={(e) => setAppOpacity(parseFloat(e.target.value))} className="accent-indigo-500" />
             </div>
-            <input type="text" value={jobRole} onChange={(e) => setJobRole(e.target.value)} placeholder="Target Job Role" className="bg-[#09090B] border border-zinc-800 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none" />
-            <textarea value={resume} onChange={(e) => setResume(e.target.value)} placeholder="Resume Context" rows={5} className="bg-[#09090B] border border-zinc-800 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none" />
+            <input type="text" value={jobRole} onChange={(e) => setJobRole(e.target.value)} placeholder="Target Job Role" className="bg-[#09090B] border border-zinc-800 focus:border-indigo-500/50 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none transition-colors" />
+            <textarea value={resume} onChange={(e) => setResume(e.target.value)} placeholder="Resume Context" rows={5} className="bg-[#09090B] border border-zinc-800 focus:border-indigo-500/50 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none transition-colors" />
           </div>
         </>
       )}
 
       {currentItem && showAnswerPanel && (
-        <div className="[-webkit-app-region:no-drag] mt-2 bg-[#1C1C1E]/95 backdrop-blur-3xl rounded-[16px] border border-white/10 p-6 mb-2 overflow-hidden flex flex-col resize-y min-h-[150px] max-h-[80vh]">
-          <div className="flex justify-between items-start mb-5">
-            <div className="flex gap-3 text-zinc-500">
-              <button onClick={goBack} disabled={currentIndex <= 0} className="hover:text-zinc-300 disabled:opacity-30 bg-zinc-800/30 p-1.5 rounded-md"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
-              <button onClick={goForward} disabled={currentIndex >= history.length - 1} className="hover:text-zinc-300 disabled:opacity-30 bg-zinc-800/30 p-1.5 rounded-md"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
-              <span className="text-xs font-mono self-center px-2 opacity-50">{currentIndex + 1} / {history.length}</span>
+        <div className="[-webkit-app-region:no-drag] mt-2 mb-2 rounded-[16px] bg-gradient-to-br from-indigo-500/30 via-purple-500/10 to-transparent p-[1px] drop-shadow-2xl">
+          <div ref={panelRef} className="bg-[#13141c]/95 backdrop-blur-3xl rounded-[15px] p-6 pt-5 pb-8 overflow-hidden flex flex-col relative" style={{ height: '320px' }}>
+            <div className="flex justify-between items-start mb-5">
+              <div className="flex gap-3 text-zinc-500">
+                <button onClick={goBack} disabled={currentIndex <= 0} className="hover:text-zinc-300 disabled:opacity-30 bg-white/5 hover:bg-white/10 p-1.5 rounded-md transition-colors"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+                <button onClick={goForward} disabled={currentIndex >= history.length - 1} className="hover:text-zinc-300 disabled:opacity-30 bg-white/5 hover:bg-white/10 p-1.5 rounded-md transition-colors"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+                <span className="text-xs font-mono self-center px-2 opacity-50">{currentIndex + 1} / {history.length}</span>
+              </div>
+              <button onClick={clearCurrentQuestion} className="hover:text-zinc-300 bg-white/5 hover:bg-red-500/20 hover:text-red-400 transition-colors p-1.5 rounded-md"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
             </div>
-            <button onClick={clearCurrentQuestion} className="hover:text-zinc-300 bg-zinc-800/30 p-1.5 rounded-md"><svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
-          </div>
-          <div className="flex-1 overflow-y-auto pr-3 pb-4 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent select-text">
-            <div className="mb-6 text-[15.5px] font-medium tracking-wide text-zinc-300 leading-relaxed">
-              <span className="font-bold text-zinc-100 mr-1">Question:</span> {currentItem.question}
+            <div className="flex-1 overflow-y-auto pr-3 pb-2 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent select-text">
+              <div className="mb-6 text-[14px] font-medium tracking-wide text-zinc-400 leading-relaxed">
+                <span className="font-bold text-zinc-300 mr-2 uppercase text-[12px] tracking-wider">Question</span> {currentItem.question}
+              </div>
+              <div className="text-[15.5px] font-medium tracking-wide text-zinc-100 leading-relaxed">
+                <span className="font-bold text-indigo-400 mr-2 uppercase text-[12px] tracking-wider">Answer</span>
+                {renderAnswer(currentItem.answer)}
+              </div>
             </div>
-            <div className="text-[15.5px] font-medium tracking-wide text-zinc-300">
-              <span className="font-bold text-zinc-100 mr-1">Answer:</span>
-              {renderAnswer(currentItem.answer)}
+            
+            {/* Custom Drag Handle */}
+            <div 
+              className="absolute bottom-0 left-0 w-full h-6 cursor-ns-resize flex items-center justify-center hover:bg-white/5 transition-colors group z-50"
+              onPointerDown={(e) => {
+                const el = e.currentTarget;
+                el.setPointerCapture(e.pointerId);
+                const startY = e.clientY;
+                const startHeight = panelRef.current ? panelRef.current.getBoundingClientRect().height : 320;
+
+                const onMove = (moveEvent: PointerEvent) => {
+                  const newHeight = Math.max(150, Math.min(startHeight + (moveEvent.clientY - startY), 1000));
+                  if (panelRef.current) {
+                    panelRef.current.style.height = `${newHeight}px`;
+                  }
+                };
+
+                const onUp = (upEvent: PointerEvent) => {
+                  el.releasePointerCapture(upEvent.pointerId);
+                  el.removeEventListener('pointermove', onMove);
+                  el.removeEventListener('pointerup', onUp);
+                };
+
+                el.addEventListener('pointermove', onMove);
+                el.addEventListener('pointerup', onUp);
+              }}
+            >
+              <div className="w-12 h-1 bg-zinc-600 rounded-full group-hover:bg-zinc-400 transition-colors"></div>
             </div>
           </div>
         </div>
