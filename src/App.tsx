@@ -38,9 +38,13 @@ function App() {
   const [isSystemAudioActive, setIsSystemAudioActive] = useState(true)
   const [analyzeScreen, setAnalyzeScreen] = useState(false)
   const analyzeScreenRef = useRef(false)
+  const [includeResume, setIncludeResume] = useState(false)
+  const includeResumeRef = useRef(true)
+
   useEffect(() => {
     analyzeScreenRef.current = analyzeScreen
-  }, [analyzeScreen])
+    includeResumeRef.current = includeResume
+  }, [analyzeScreen, includeResume])
 
   // Dynamically resize the Electron window to match the React app height
   useEffect(() => {
@@ -258,7 +262,7 @@ function App() {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'trigger_llm',
-        resume: localStorage.getItem('resume') || '',
+        resume: includeResumeRef.current ? (localStorage.getItem('resume') || '') : '',
         jobRole: localStorage.getItem('jobRole') || '',
         image: imageBase64,
         history: historyRef.current
@@ -491,14 +495,24 @@ function App() {
               <span>AI Help</span>
             </button>
 
-            <label className="flex items-center gap-2 bg-[#1e1f2e] border border-indigo-500/20 shadow-sm rounded-full px-3 py-1.5 text-[12px] font-semibold tracking-wide text-zinc-300 cursor-pointer hover:bg-[#2a2b3d] transition-colors">
+            <label title="Include Screen" className="flex items-center gap-2 bg-[#1e1f2e] border border-indigo-500/20 shadow-sm rounded-full px-2.5 py-1.5 text-zinc-300 cursor-pointer hover:bg-[#2a2b3d] transition-colors">
               <input
                 type="checkbox"
                 checked={analyzeScreen}
                 onChange={(e) => setAnalyzeScreen(e.target.checked)}
-                className="rounded bg-[#13141c] border-zinc-600 text-indigo-500 focus:ring-indigo-500/50 focus:ring-offset-0 focus:ring-1"
+                className="rounded bg-[#13141c] border-zinc-600 text-indigo-500 focus:ring-indigo-500/50 focus:ring-offset-0 focus:ring-1 cursor-pointer"
               />
-              <span>+ Screen</span>
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            </label>
+
+            <label title="Include Resume Context" className="flex items-center gap-2 bg-[#1e1f2e] border border-indigo-500/20 shadow-sm rounded-full px-2.5 py-1.5 text-zinc-300 cursor-pointer hover:bg-[#2a2b3d] transition-colors">
+              <input
+                type="checkbox"
+                checked={includeResume}
+                onChange={(e) => setIncludeResume(e.target.checked)}
+                className="rounded bg-[#13141c] border-zinc-600 text-indigo-500 focus:ring-indigo-500/50 focus:ring-offset-0 focus:ring-1 cursor-pointer"
+              />
+              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 8 8 9"></polyline></svg>
             </label>
 
             <button onClick={exportInterview} title="Save Interview as Markdown" className="flex items-center gap-2 bg-[#1e1f2e] hover:bg-[#2a2b3d] transition-all duration-200 border border-indigo-500/20 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white">
