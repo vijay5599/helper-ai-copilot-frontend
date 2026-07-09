@@ -580,7 +580,7 @@ function App() {
             
             {/* Custom Drag Handle */}
             <div 
-              className="absolute bottom-0 left-0 w-full h-6 cursor-ns-resize flex items-center justify-center hover:bg-white/5 transition-colors group z-50"
+              className="absolute bottom-0 left-0 w-full h-6 flex items-center justify-center hover:bg-white/5 transition-colors group z-50"
               onPointerDown={(e) => {
                 const el = e.currentTarget;
                 el.setPointerCapture(e.pointerId);

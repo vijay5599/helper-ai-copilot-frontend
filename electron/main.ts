@@ -92,9 +92,9 @@ app.whenReady().then(() => {
 
   createWindow();
 
-  // Register a 'CommandOrControl+Enter' shortcut listener.
-  globalShortcut.register('CommandOrControl+Enter', () => {
-    console.log('Ctrl+Enter is pressed: Triggering LLM');
+  // Register a 'Shift+Enter' shortcut listener.
+  globalShortcut.register('Shift+Enter', () => {
+    console.log('Shift+Enter is pressed: Triggering LLM');
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('trigger-llm');
     }
