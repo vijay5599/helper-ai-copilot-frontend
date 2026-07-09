@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 const { ipcRenderer } = (window as any).require('electron')
 
@@ -403,6 +404,7 @@ function App() {
     return (
       <div className="mt-3 text-zinc-100 text-[15px] font-medium leading-relaxed tracking-wide">
         <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
           components={{
             ul: ({ node, ...props }) => <ul className="space-y-3 mt-3 ml-2" {...props} />,
             li: ({ node, ...props }) => (
@@ -412,6 +414,12 @@ function App() {
               </li>
             ),
             p: ({ node, ...props }) => <p className="mb-3 last:mb-0" {...props} />,
+            table: ({node, ...props}) => <div className="overflow-x-auto my-4 rounded-lg border border-zinc-800"><table className="w-full text-left border-collapse text-[13.5px]" {...props} /></div>,
+            thead: ({node, ...props}) => <thead className="bg-[#1e1f2e] text-zinc-200 font-semibold uppercase text-[11px] tracking-wider" {...props} />,
+            tbody: ({node, ...props}) => <tbody className="divide-y divide-zinc-800/50 bg-[#12131a]" {...props} />,
+            tr: ({node, ...props}) => <tr className="hover:bg-[#1a1b26]/50 transition-colors" {...props} />,
+            th: ({node, ...props}) => <th className="px-4 py-3 font-semibold" {...props} />,
+            td: ({node, ...props}) => <td className="px-4 py-3 text-zinc-300 align-top" {...props} />,
             code: ({ node, inline, className, children, ...props }: any) => {
               const codeText = String(children).replace(/\n$/, '')
               // Catch arrays like "[3, 3]" or other short snippets that have spaces but are clearly meant to be inline
