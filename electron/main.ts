@@ -100,6 +100,18 @@ app.whenReady().then(() => {
     }
   });
 
+  // Ghost Mode: Toggle click-through and opacity
+  let isGhostMode = false;
+  globalShortcut.register('Alt+X', () => {
+    isGhostMode = !isGhostMode;
+    console.log(`Ghost Mode: ${isGhostMode}`);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      // forward: true allows mouse events to pass through to the OS behind the app
+      mainWindow.setIgnoreMouseEvents(isGhostMode, { forward: true });
+      mainWindow.webContents.send('toggle-ghost-mode', isGhostMode);
+    }
+  });
+
   ipcMain.on('resize-window', (event, { height }) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       const bounds = mainWindow.getBounds();
