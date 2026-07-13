@@ -84,6 +84,7 @@ function App() {
   const [resume, setResume] = useState(() => localStorage.getItem('resume') || '')
   const [jobRole, setJobRole] = useState(() => localStorage.getItem('jobRole') || '')
   const [appOpacity, setAppOpacity] = useState(() => parseFloat(localStorage.getItem('appOpacity') || '0.95'))
+  const [isGhostMode, setIsGhostMode] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
@@ -135,9 +136,15 @@ function App() {
     const handleTrigger = () => triggerTextOnly()
     ipcRenderer.on('trigger-llm', handleTrigger)
 
+    const handleToggleGhostMode = (_event: any, state: boolean) => {
+      setIsGhostMode(state);
+    }
+    ipcRenderer.on('toggle-ghost-mode', handleToggleGhostMode)
+
     return () => {
       ws.close()
       ipcRenderer.removeListener('trigger-llm', handleTrigger)
+      ipcRenderer.removeListener('toggle-ghost-mode', handleToggleGhostMode)
       mediaRecorderRef.current?.stop()
 
       micStreamRef.current?.getTracks().forEach(t => t.stop())
@@ -458,7 +465,7 @@ function App() {
   const currentItem = history[currentIndex];
 
   return (
-    <div id="app-container" ref={containerRef} className={`w-full flex flex-col font-sans select-none overflow-hidden relative text-white bg-transparent h-auto`} style={{ opacity: appOpacity }}>
+    <div id="app-container" ref={containerRef} className={`w-full flex flex-col font-sans select-none overflow-hidden relative text-white bg-transparent h-auto transition-opacity duration-200`} style={{ opacity: isGhostMode ? 0.1 : appOpacity }}>
       <video ref={videoRef} autoPlay playsInline muted className="hidden" />
       <canvas ref={canvasRef} className="hidden" />
 
