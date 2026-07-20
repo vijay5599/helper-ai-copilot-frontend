@@ -276,6 +276,13 @@ function App() {
         history: historyRef.current
       }))
     }
+    
+    // Restart recording to create a new WebM header for the backend
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.start(250);
+    }
+
     setHistory(prev => {
       const next = [...prev, { question: imageBase64 ? "Analyzing screen..." : q, answer: "Generating answer..." }];
       setCurrentIndex(next.length - 1);
@@ -329,6 +336,12 @@ function App() {
     setCurrentIndex(-1)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'clear_transcript' }))
+    }
+    
+    // Restart recording to create a new WebM header for the backend
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.start(250);
     }
   }
 
