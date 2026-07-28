@@ -1,6 +1,7 @@
 import { app, BrowserWindow, globalShortcut, ipcMain, session, systemPreferences, desktopCapturer, screen } from 'electron';
 import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
+import { startWebSocketServer } from './server';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -21,8 +22,9 @@ function createWindow() {
     frame: false,
     skipTaskbar: true,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
     }
   });
 
@@ -30,20 +32,34 @@ function createWindow() {
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   // Hides the window from screen capturing software (Zoom, Meet, OBS)
-  mainWindow.setContentProtection(true); // Commented out temporarily for screenshots
+  // mainWindow.setContentProtection(true); // Commented out temporarily for screenshots
 
   // Hide the app from the Windows taskbar
   if (process.platform === 'win32') {
     mainWindow.setSkipTaskbar(true);
   }
 
-  if (process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
+  // Load from Next.js dev server or compiled out/index.html
+  const isDev = !app.isPackaged || process.env.NODE_ENV === 'development';
+  if (isDev) {
+    const loadURLWithRetry = (url: string) => {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      mainWindow.loadURL(url).catch((err) => {
+        console.log(`Failed to load ${url}, retrying in 1s...`);
+        setTimeout(() => loadURLWithRetry(url), 1000);
+      });
+    };
+    loadURLWithRetry('http://localhost:3000');
     // Automatically open Developer Tools in dev mode
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    mainWindow.loadFile(path.join(__dirname, '../out/index.html'));
   }
+
+  // Redirect console messages from renderer to main process terminal
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[Renderer Console] ${message}`);
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -63,6 +79,9 @@ ipcMain.on('resize-window', (event, height) => {
 });
 
 app.whenReady().then(() => {
+  // Start local WebSocket backend server on port 8000
+  startWebSocketServer(8000);
+
   app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
   if (process.platform === 'darwin') {
     systemPreferences.askForMediaAccess('microphone');

@@ -5,12 +5,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "concurrently \"next dev --webpack\" \"npx esbuild electron/main.ts --bundle --platform=node --target=node20 --outfile=dist-electron/main.js --format=esm --packages=external --watch\" \"npx esbuild electron/preload.ts --bundle --platform=node --target=node20 --outfile=dist-electron/preload.js --format=cjs --packages=external --watch\" \"sleep 2 && electron .\"",
+    "build": "next build --webpack && tsc -b && npx esbuild electron/main.ts --bundle --platform=node --target=node20 --outfile=dist-electron/main.js --format=esm --packages=external && npx esbuild electron/preload.ts --bundle --platform=node --target=node20 --outfile=dist-electron/preload.js --format=cjs --packages=external",
     "build:mac": "npm run build && electron-builder --mac",
     "build:win": "npm run build && electron-builder --win",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "next start"
   },
   "build": {
     "appId": "com.helperai.app",
@@ -26,18 +26,24 @@
     }
   },
   "dependencies": {
+    "dotenv": "^17.4.2",
+    "next": "^16.2.12",
+    "openai": "^6.49.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.5.2",
+    "concurrently": "^9.2.4",
     "electron": "^41.7.1",
     "electron-builder": "^26.15.3",
     "oxlint": "^1.71.0",
