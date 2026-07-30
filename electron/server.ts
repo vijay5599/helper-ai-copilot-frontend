@@ -3,28 +3,28 @@ import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { getSystemPrompt } from './prompts';
 
-// Load environment variables from frontend and backend directories
+// Load environment variables from a single common .env file
 const cwd = process.cwd();
-const frontendEnv = path.join(cwd, '.env');
-const backendEnv = path.join(cwd, '../backend/.env');
+const execDir = path.dirname(process.execPath);
 
-if (fs.existsSync(frontendEnv)) {
-  dotenv.config({ path: frontendEnv });
-} else {
-  const fallbackFrontend = path.join(cwd, 'frontend', '.env');
-  if (fs.existsSync(fallbackFrontend)) {
-    dotenv.config({ path: fallbackFrontend });
-  }
-}
+const envLocations = [
+  path.join(cwd, '.env'),
+  path.join(cwd, 'frontend', '.env'),
+  path.join(execDir, '.env'),
+  path.join(execDir, '../../..', '.env'), // next to HelperAI.app on macOS
+  path.join(execDir, '../../../../..', '.env'), // project root if running from release/mac-arm64/...
+  '/Users/vijay5599/Developer/Projects/helper-ai-copilot-frontend/.env', // Absolute workspace path
+  path.join(os.homedir(), '.env'),
+];
 
-if (fs.existsSync(backendEnv)) {
-  dotenv.config({ path: backendEnv });
-} else {
-  const fallbackBackend = path.join(cwd, 'backend', '.env');
-  if (fs.existsSync(fallbackBackend)) {
-    dotenv.config({ path: fallbackBackend });
+for (const envPath of envLocations) {
+  if (fs.existsSync(envPath)) {
+    dotenv.config({ path: envPath });
+    console.log(`Loaded environment from: ${envPath}`);
+    break;
   }
 }
 

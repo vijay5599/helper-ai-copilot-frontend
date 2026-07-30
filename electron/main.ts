@@ -1,10 +1,14 @@
-import { app, BrowserWindow, globalShortcut, ipcMain, session, systemPreferences, desktopCapturer, screen } from 'electron';
-import { fileURLToPath } from 'url';
+import { app, BrowserWindow, globalShortcut, ipcMain, session, systemPreferences, desktopCapturer, screen, protocol, net } from 'electron';
+import { fileURLToPath, pathToFileURL } from 'url';
 import path, { dirname } from 'path';
 import { startWebSocketServer } from './server';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } }
+]);
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -53,7 +57,7 @@ function createWindow() {
     // Automatically open Developer Tools in dev mode
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../out/index.html'));
+    mainWindow.loadURL('app://local/index.html');
   }
 
   // Redirect console messages from renderer to main process terminal
@@ -79,6 +83,17 @@ ipcMain.on('resize-window', (event, height) => {
 });
 
 app.whenReady().then(() => {
+  // Register custom protocol handler for app:// to serve local static files securely
+  protocol.handle('app', (request) => {
+    const url = new URL(request.url);
+    let pathname = decodeURIComponent(url.pathname);
+    if (pathname === '/' || pathname === '') {
+      pathname = '/index.html';
+    }
+    const filePath = path.join(__dirname, '../out', pathname);
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
+
   // Start local WebSocket backend server on port 8000
   startWebSocketServer(8000);
 
@@ -157,9 +172,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  app.quit();
 });
 
 app.on('will-quit', () => {
