@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"next dev --webpack\" \"npx esbuild electron/main.ts --bundle --platform=node --target=node20 --outfile=dist-electron/main.js --format=esm --packages=external --watch\" \"npx esbuild electron/preload.ts --bundle --platform=node --target=node20 --outfile=dist-electron/preload.js --format=cjs --packages=external --watch\" \"node -e \\\"setTimeout(Object, 2000)\\\" && electron .\"",
-    "build": "next build --webpack && tsc -b && npx esbuild electron/main.ts --bundle --platform=node --target=node20 --outfile=dist-electron/main.js --format=esm --packages=external && npx esbuild electron/preload.ts --bundle --platform=node --target=node20 --outfile=dist-electron/preload.js --format=cjs --packages=external",
+    "build": "next build --webpack && npx esbuild electron/main.ts --bundle --platform=node --target=node20 --outfile=dist-electron/main.js --format=esm --packages=external && npx esbuild electron/preload.ts --bundle --platform=node --target=node20 --outfile=dist-electron/preload.js --format=cjs --packages=external",
     "build:mac": "npm run build && electron-builder --mac",
     "build:win": "npm run build && electron-builder --win",
     "lint": "oxlint",

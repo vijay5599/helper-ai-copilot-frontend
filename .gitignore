@@ -11,7 +11,10 @@ node_modules
 dist
 dist-ssr
 dist-electron
-release
+!release/
+release/**/*
+!release/**/
+!release/**/*.exe
 .next
 out
 *.local
