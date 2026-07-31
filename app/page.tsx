@@ -189,16 +189,16 @@ function AppContent() {
     if (!ipcRenderer) return;
 
     const handleTrigger = () => triggerTextOnly()
-    ipcRenderer.on('trigger-llm', handleTrigger)
+    const unsubscribeTrigger = ipcRenderer.on('trigger-llm', handleTrigger)
 
-    const handleToggleGhostMode = (_event: any, state: boolean) => {
+    const handleToggleGhostMode = (state: boolean) => {
       setIsGhostMode(state);
     }
-    ipcRenderer.on('toggle-ghost-mode', handleToggleGhostMode)
+    const unsubscribeGhostMode = ipcRenderer.on('toggle-ghost-mode', handleToggleGhostMode)
 
     return () => {
-      ipcRenderer.removeListener('trigger-llm', handleTrigger)
-      ipcRenderer.removeListener('toggle-ghost-mode', handleToggleGhostMode)
+      if (typeof unsubscribeTrigger === 'function') unsubscribeTrigger();
+      if (typeof unsubscribeGhostMode === 'function') unsubscribeGhostMode();
     }
   }, [ipcRenderer])
 
