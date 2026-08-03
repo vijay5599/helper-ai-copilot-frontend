@@ -62,10 +62,23 @@ function AppContent() {
   const [includeResume, setIncludeResume] = useState(false)
   const includeResumeRef = useRef(true)
 
+  const [inputMode, setInputMode] = useState<'audio' | 'text'>('audio')
+  const inputModeRef = useRef<'audio' | 'text'>('audio')
+  const [textQuery, setTextQuery] = useState('')
+  const textQueryRef = useRef('')
+
   useEffect(() => {
     analyzeScreenRef.current = analyzeScreen
     includeResumeRef.current = includeResume
   }, [analyzeScreen, includeResume])
+
+  useEffect(() => {
+    inputModeRef.current = inputMode
+  }, [inputMode])
+
+  useEffect(() => {
+    textQueryRef.current = textQuery
+  }, [textQuery])
 
   // Dynamically resize the Electron window to match the React app height
   useEffect(() => {
@@ -297,7 +310,8 @@ function AppContent() {
   }
 
   const triggerTextOnly = () => {
-    const q = transcriptRef.current;
+    const isText = inputModeRef.current === 'text';
+    const q = isText ? textQueryRef.current : transcriptRef.current;
 
     let imageBase64 = ""
     if (analyzeScreenRef.current && videoRef.current && canvasRef.current) {
@@ -314,21 +328,43 @@ function AppContent() {
       }
     }
 
+    const hasText = q && q.trim() && q !== "Waiting for speech..." && q !== "Waiting for transcript...";
+    if (!hasText && !imageBase64) {
+      return; // Do nothing if there's no query and no screen analysis
+    }
+
+    const queryToSend = hasText ? q.trim() : '';
+
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'trigger_llm',
+        query: queryToSend,
         resume: includeResumeRef.current ? (localStorage.getItem('resume') || '') : '',
         jobRole: localStorage.getItem('jobRole') || '',
         image: imageBase64,
         history: historyRef.current
       }))
     }
+
     setHistory(prev => {
-      const next = [...prev, { question: imageBase64 ? "Analyzing screen..." : q, answer: "Generating answer..." }];
+      let displayQuestion = "";
+      if (imageBase64) {
+        displayQuestion = queryToSend ? `Analyzing screen: ${queryToSend}` : "Analyzing screen...";
+      } else {
+        displayQuestion = queryToSend;
+      }
+      const next = [...prev, { question: displayQuestion, answer: "Generating answer..." }];
       setCurrentIndex(next.length - 1);
       return next;
     });
+
     setShowAnswerPanel(true)
+
+    if (isText) {
+      setTextQuery('');
+      setTranscript('');
+      transcriptRef.current = '';
+    }
   }
 
   const closeApp = () => {
@@ -340,6 +376,7 @@ function AppContent() {
   const clearData = () => {
     setTranscript("Waiting for speech...")
     transcriptRef.current = "Waiting for speech..."
+    setTextQuery('')
     setHistory([])
     setCurrentIndex(-1)
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -376,6 +413,43 @@ function AppContent() {
   const goForward = () => {
     if (currentIndex < history.length - 1) setCurrentIndex(currentIndex + 1)
   }
+
+  const handleModeChange = (mode: 'audio' | 'text') => {
+    setInputMode(mode);
+    if (mode === 'text') {
+      if (transcript && transcript !== "Waiting for speech..." && transcript !== "Waiting for transcript..." && !transcript.startsWith("Error:")) {
+        setTextQuery(transcript);
+      } else {
+        setTextQuery('');
+      }
+
+      setIsMicActive(false);
+      if (micStreamRef.current) {
+        micStreamRef.current.getAudioTracks().forEach(track => {
+          track.enabled = false;
+        });
+      }
+      setIsSystemAudioActive(false);
+      if (systemStreamRef.current) {
+        systemStreamRef.current.getAudioTracks().forEach(track => {
+          track.enabled = false;
+        });
+      }
+    } else {
+      setIsMicActive(true);
+      if (micStreamRef.current) {
+        micStreamRef.current.getAudioTracks().forEach(track => {
+          track.enabled = true;
+        });
+      }
+      setIsSystemAudioActive(true);
+      if (systemStreamRef.current) {
+        systemStreamRef.current.getAudioTracks().forEach(track => {
+          track.enabled = true;
+        });
+      }
+    }
+  };
 
   const toggleMic = () => {
     setIsMicActive(prev => {
@@ -498,6 +572,32 @@ function AppContent() {
               <span>HelperAI</span>
             </div>
             <div className="w-[1px] h-5 bg-zinc-700/50 mx-1"></div>
+            <div className="no-drag flex items-center bg-[#1e1f2e] rounded-full p-0.5 border border-indigo-500/10 shadow-inner">
+              <button
+                onClick={() => handleModeChange('audio')}
+                title="Audio Mode"
+                className={`flex items-center justify-center p-1.5 rounded-full transition-all duration-200 ${inputMode === 'audio'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                  : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => handleModeChange('text')}
+                title="Text Mode"
+                className={`flex items-center justify-center p-1.5 rounded-full transition-all duration-200 ${inputMode === 'text'
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-md'
+                  : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z" />
+                </svg>
+              </button>
+            </div>
             <div className="flex items-center gap-1">
               <button
                 onClick={toggleMic}
@@ -521,6 +621,8 @@ function AppContent() {
                 </svg>
               </button>
             </div>
+            <div className="w-[1px] h-5 bg-zinc-700/50 mx-1"></div>
+
           </div>
 
           <div className="no-drag flex items-center gap-2">
@@ -551,10 +653,10 @@ function AppContent() {
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 8 8 9"></polyline></svg>
             </label>
 
-            <button onClick={exportInterview} title="Save Interview as Markdown" className="flex items-center gap-2 bg-[#1e1f2e] hover:bg-[#2a2b3d] transition-all duration-200 border border-indigo-500/20 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white">
+            {/* <button onClick={exportInterview} title="Save Interview as Markdown" className="flex items-center gap-2 bg-[#1e1f2e] hover:bg-[#2a2b3d] transition-all duration-200 border border-indigo-500/20 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white">
               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               <span>Save</span>
-            </button>
+            </button> */}
             <button onClick={clearData} className="flex items-center gap-2 bg-[#1e1f2e] hover:bg-red-500/20 hover:text-red-400 hover:border-red-500/50 transition-all duration-200 border border-indigo-500/20 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 group">
               <span>Clear</span>
             </button>
@@ -574,16 +676,46 @@ function AppContent() {
         </div>
       </div>
       <div className="no-drag mt-2 mb-2 rounded-[16px] bg-gradient-to-br from-indigo-500/20 via-purple-500/10 to-transparent p-[1px] drop-shadow-2xl">
-        <div className="bg-[#13141c] rounded-[15px] px-4 py-2.5 flex justify-between items-center text-[13px] text-zinc-300 font-medium tracking-wide backdrop-blur-2xl">
-          <div className="truncate pr-4 flex-1 text-wrap">{transcript || "Waiting for transcript..."}</div>
-          <button onClick={() => setShowAnswerPanel(!showAnswerPanel)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1e1f2e] hover:bg-[#2a2b3d] border border-indigo-500/10 text-zinc-300 transition-colors shadow-sm whitespace-nowrap group">
-            <span className="font-semibold text-[12px]">{showAnswerPanel ? "Hide Answer" : "Show Answer"}</span>
-            {showAnswerPanel ? (
-              <svg className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
-            ) : (
-              <svg className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-            )}
-          </button>
+        <div className="bg-[#13141c] rounded-[15px] px-4 py-2 flex justify-between items-center text-[13px] text-zinc-300 font-medium tracking-wide backdrop-blur-2xl min-h-[48px]">
+          {inputMode === 'audio' ? (
+            <>
+              <div className="truncate pr-4 flex-1 text-wrap py-2.5">{transcript || "Waiting for transcript..."}</div>
+              <button onClick={() => setShowAnswerPanel(!showAnswerPanel)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1e1f2e] hover:bg-[#2a2b3d] border border-indigo-500/10 text-zinc-300 transition-colors shadow-sm whitespace-nowrap group">
+                <span className="font-semibold text-[12px]">{showAnswerPanel ? "Hide Answer" : "Show Answer"}</span>
+                {showAnswerPanel ? (
+                  <svg className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                )}
+              </button>
+            </>
+          ) : (
+            <div className="flex-1 flex gap-3 items-center py-2">
+              <input
+                type="text"
+                value={textQuery}
+                onChange={(e) => setTextQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    triggerTextOnly();
+                  }
+                }}
+                placeholder="Type your query here and press Enter..."
+                className="flex-1 bg-transparent border-0 outline-none text-zinc-100 placeholder-zinc-500 text-[13px] py-1.5 focus:ring-0"
+              />
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowAnswerPanel(!showAnswerPanel)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#1e1f2e] hover:bg-[#2a2b3d] border border-indigo-500/10 text-zinc-300 transition-colors shadow-sm whitespace-nowrap group">
+                  <span className="font-semibold text-[12px]">{showAnswerPanel ? "Hide Answer" : "Show Answer"}</span>
+                  {showAnswerPanel ? (
+                    <svg className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
+                  ) : (
+                    <svg className="w-3.5 h-3.5 text-zinc-400 group-hover:text-zinc-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

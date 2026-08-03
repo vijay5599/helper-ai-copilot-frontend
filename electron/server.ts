@@ -214,6 +214,10 @@ export function startWebSocketServer(port: number = 8000) {
             const jobRole = data.jobRole || '';
             const imageData = data.image || '';
 
+            if (typeof data.query === 'string') {
+              contextBuffer = data.query;
+            }
+
             if (resumeCtx.length > 15000) {
               console.log("Truncating massive resume context to prevent API rate limits...");
               resumeCtx = resumeCtx.slice(0, 15000) + "\n...\n[TRUNCATED TO SAVE TOKENS]";
