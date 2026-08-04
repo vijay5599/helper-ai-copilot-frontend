@@ -36,7 +36,7 @@ function createWindow() {
   mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   // Hides the window from screen capturing software (Zoom, Meet, OBS)
-  // mainWindow.setContentProtection(true); // Commented out temporarily for screenshots
+  mainWindow.setContentProtection(true); // Commented out temporarily for screenshots
 
   // Hide the app from the Windows taskbar
   if (process.platform === 'win32') {
