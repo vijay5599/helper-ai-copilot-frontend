@@ -279,11 +279,11 @@ export function startWebSocketServer(port: number = 8000) {
             // Decide between Groq and OpenAI
             const useGroq = (process.env.USE_GROQ || 'true').toLowerCase() === 'true' && groqClient !== null;
             let activeClient = openaiClient;
-            let activeModel = 'gpt-4o-mini';
+            let activeModel = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
             if (useGroq && !imageData && groqClient) {
               activeClient = groqClient;
-              activeModel = 'llama-3.1-8b-instant';
+              activeModel = process.env.GROQ_MODEL || 'groq/compound-mini';
             }
 
             if (!activeClient) {
@@ -336,10 +336,11 @@ export function startWebSocketServer(port: number = 8000) {
               console.error('Error during LLM completion:', err);
               // Fallback to OpenAI if Groq failed
               if (useGroq && !imageData && openaiClient) {
-                console.log('⚠️ Groq request failed. Falling back to OpenAI (gpt-4o-mini)...');
+                const fallbackModel = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+                console.log(`⚠️ Groq request failed. Falling back to OpenAI (${fallbackModel})...`);
                 try {
                   const fallbackStream = await openaiClient.chat.completions.create({
-                    model: 'gpt-4o-mini',
+                    model: fallbackModel,
                     messages: messages,
                     stream: true,
                     max_tokens: 1000
