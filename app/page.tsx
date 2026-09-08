@@ -5,6 +5,33 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 
+const DOMAIN_PRESETS = [
+  {
+    id: 'all-in-one',
+    label: '⚡ All-in-One Copilot',
+    shortLabel: '⚡ All-in-One',
+    role: 'Full Stack, GenAI, Embedded C, AUTOSAR & Systems Specialist'
+  },
+  {
+    id: 'embedded-autosar',
+    label: '🚗 Embedded',
+    shortLabel: '🚗 Embedded',
+    role: 'Embedded Software Engineer / AUTOSAR, OBD, MCUs & Protocols Specialist'
+  },
+  {
+    id: 'fullstack-ai',
+    label: '🌐 Fullstack & GenAI',
+    shortLabel: '🌐 Fullstack & GenAI',
+    role: 'Full Stack Developer / GenAI & System Design Engineer'
+  },
+  {
+    id: 'custom',
+    label: '⚙️ Custom Role',
+    shortLabel: '⚙️ Custom Role',
+    role: ''
+  }
+];
+
 const TimerDisplay = () => {
   const [timer, setTimer] = useState(0)
 
@@ -96,8 +123,10 @@ function AppContent() {
         // Throttle the OS-level window resize to prevent drag lag
         if (!throttleTimeout) {
           throttleTimeout = setTimeout(() => {
-            if (typeof window !== 'undefined' && window.resizeTo) {
-              window.resizeTo(800, height);
+            if (ipcRenderer) {
+              ipcRenderer.send('resize-window', { height });
+            } else if (typeof window !== 'undefined' && window.resizeTo) {
+              window.resizeTo(920, height);
             }
             lastHeight = height;
             throttleTimeout = null;
@@ -118,6 +147,7 @@ function AppContent() {
   const [showAnswerPanel, setShowAnswerPanel] = useState(true)
   const [resume, setResume] = useState('')
   const [jobRole, setJobRole] = useState('')
+  const [domainPreset, setDomainPreset] = useState('all-in-one')
   const [appOpacity, setAppOpacity] = useState(0.95)
   const [isGhostMode, setIsGhostMode] = useState(false)
   const [isSettingsLoaded, setIsSettingsLoaded] = useState(false)
@@ -138,6 +168,7 @@ function AppContent() {
     if (typeof window !== 'undefined') {
       setResume(localStorage.getItem('resume') || '')
       setJobRole(localStorage.getItem('jobRole') || '')
+      setDomainPreset(localStorage.getItem('domainPreset') || 'all-in-one')
       const storedOpacity = localStorage.getItem('appOpacity');
       if (storedOpacity) {
         const val = parseFloat(storedOpacity);
@@ -153,9 +184,18 @@ function AppContent() {
     if (isSettingsLoaded && typeof window !== 'undefined') {
       localStorage.setItem('resume', resume)
       localStorage.setItem('jobRole', jobRole)
+      localStorage.setItem('domainPreset', domainPreset)
       localStorage.setItem('appOpacity', appOpacity.toString())
     }
-  }, [resume, jobRole, appOpacity, isSettingsLoaded])
+  }, [resume, jobRole, domainPreset, appOpacity, isSettingsLoaded])
+
+  const getEffectiveJobRole = () => {
+    if (domainPreset === 'custom') {
+      return jobRole || localStorage.getItem('jobRole') || '';
+    }
+    const preset = DOMAIN_PRESETS.find(p => p.id === domainPreset);
+    return preset ? preset.role : (jobRole || '');
+  };
 
   useEffect(() => {
     // Port 8000 is our Node WebSocket/API backend
@@ -197,6 +237,18 @@ function AppContent() {
       }
     }
   }, [])
+
+  // Window-level Shift+Enter keydown listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.shiftKey && e.key === 'Enter') {
+        e.preventDefault();
+        triggerTextOnly();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     if (!ipcRenderer) return;
@@ -330,21 +382,44 @@ function AppContent() {
 
     const hasText = q && q.trim() && q !== "Waiting for speech..." && q !== "Waiting for transcript...";
     if (!hasText && !imageBase64) {
-      return; // Do nothing if there's no query and no screen analysis
+      setHistory(prev => {
+        const next = [...prev, {
+          question: isText ? "Empty input query" : "No speech detected",
+          answer: isText
+            ? "⚠️ **Text Mode**: Please type your interview question in the input box below and press **Enter** or click **AI Help**."
+            : "⚠️ **Audio Mode**: No speech has been transcribed yet.\n\n- Speak into your microphone (ensure the 🎤 icon is green).\n- Once transcribed, click **AI Help** or press **Shift+Enter**.\n- Or switch to **Text Mode** (💬) on the top left to type your question directly."
+        }];
+        setCurrentIndex(next.length - 1);
+        return next;
+      });
+      setShowAnswerPanel(true);
+      return;
     }
 
     const queryToSend = hasText ? q.trim() : '';
 
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'trigger_llm',
-        query: queryToSend,
-        resume: includeResumeRef.current ? (localStorage.getItem('resume') || '') : '',
-        jobRole: localStorage.getItem('jobRole') || '',
-        image: imageBase64,
-        history: historyRef.current
-      }))
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      setHistory(prev => {
+        const next = [...prev, {
+          question: queryToSend || "Connection Error",
+          answer: "⚠️ **Backend Disconnected**: Cannot connect to the WebSocket server at `ws://localhost:8000`. Please ensure the Electron / Node server is running."
+        }];
+        setCurrentIndex(next.length - 1);
+        return next;
+      });
+      setShowAnswerPanel(true);
+      return;
     }
+
+    wsRef.current.send(JSON.stringify({
+      type: 'trigger_llm',
+      query: queryToSend,
+      resume: includeResumeRef.current ? (localStorage.getItem('resume') || '') : '',
+      jobRole: getEffectiveJobRole(),
+      domainPreset: domainPreset,
+      image: imageBase64,
+      history: historyRef.current
+    }))
 
     setHistory(prev => {
       let displayQuestion = "";
@@ -626,6 +701,31 @@ function AppContent() {
           </div>
 
           <div className="no-drag flex items-center gap-2">
+            {/* Domain Preset Dropdown */}
+            <div className="relative flex items-center">
+              <select
+                value={domainPreset}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDomainPreset(val);
+                  localStorage.setItem('domainPreset', val);
+                }}
+                title="Interview Domain Preset"
+                className="appearance-none bg-[#1e1f2e] hover:bg-[#2a2b3d] border border-indigo-500/30 shadow-sm rounded-full pl-3 pr-7 py-1.5 text-[12px] font-semibold tracking-wide text-zinc-200 hover:text-white cursor-pointer outline-none transition-all duration-200 focus:border-indigo-500/60"
+              >
+                {DOMAIN_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id} className="bg-[#13141c] text-zinc-200">
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+              <div className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+
             <button
               onClick={triggerTextOnly}
               className="flex items-center gap-2 bg-[#1e1f2e] hover:bg-[#2a2b3d] transition-all duration-200 border border-indigo-500/20 shadow-sm rounded-full px-4 py-1.5 text-[13px] font-semibold tracking-wide text-zinc-200 hover:text-white"
@@ -733,8 +833,34 @@ function AppContent() {
               <label className="text-zinc-300 text-[13px] font-semibold tracking-wide">App Opacity: {Math.round(appOpacity * 100)}%</label>
               <input type="range" min="0.1" max="1" step="0.05" value={appOpacity} onChange={(e) => setAppOpacity(parseFloat(e.target.value))} className="accent-indigo-500" />
             </div>
-            <input type="text" value={jobRole} onChange={(e) => setJobRole(e.target.value)} placeholder="Target Job Role" className="bg-[#09090B] border border-zinc-800 focus:border-indigo-500/50 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none transition-colors" />
-            <textarea value={resume} onChange={(e) => setResume(e.target.value)} placeholder="Resume Context" rows={5} className="bg-[#09090B] border border-zinc-800 focus:border-indigo-500/50 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none transition-colors" />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-zinc-300 text-[13px] font-semibold tracking-wide">Domain Preset</label>
+              <select
+                value={domainPreset}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setDomainPreset(val);
+                  localStorage.setItem('domainPreset', val);
+                }}
+                className="bg-[#09090B] border border-zinc-800 focus:border-indigo-500/50 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none transition-colors"
+              >
+                {DOMAIN_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id} className="bg-[#13141c] text-zinc-200">
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {domainPreset === 'custom' && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-zinc-300 text-[13px] font-semibold tracking-wide">Custom Target Role</label>
+                <input type="text" value={jobRole} onChange={(e) => setJobRole(e.target.value)} placeholder="Target Job Role (e.g. Embedded Firmware Engineer)" className="bg-[#09090B] border border-zinc-800 focus:border-indigo-500/50 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none transition-colors" />
+              </div>
+            )}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-zinc-300 text-[13px] font-semibold tracking-wide">Candidate Resume Context</label>
+              <textarea value={resume} onChange={(e) => setResume(e.target.value)} placeholder="Paste your resume or key experience context here..." rows={5} className="bg-[#09090B] border border-zinc-800 focus:border-indigo-500/50 rounded-lg px-3 py-2.5 text-[14px] text-zinc-200 outline-none transition-colors" />
+            </div>
           </div>
         </>
       )}

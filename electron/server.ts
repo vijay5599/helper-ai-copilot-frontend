@@ -77,7 +77,28 @@ const keywordList = [
   "CI/CD pipeline", "deployment", "automation", "Azure App Service",
   "MySQL", "OpenSearch", "Supabase", "Azure Blob Storage", "Cloud Storage", "data persistence",
   "Retrieval Augmented Generation", "zero-shot prompting", "few-shot prompting",
-  "parameter-efficient fine-tuning", "PEFT", "QLoRA", "instruction following", "role-playing"
+  "parameter-efficient fine-tuning", "PEFT", "QLoRA", "instruction following", "role-playing",
+  // C Programming & Memory Management
+  "pointer arithmetic", "function pointers", "void pointer", "const pointer",
+  "volatile", "structure padding", "bit fields", "typedef", "memory alignment",
+  "malloc", "calloc", "realloc", "free", "static", "extern", "linker script",
+  // Embedded C & Microcontrollers
+  "memory mapped IO", "MMIO", "Endianness", "ISR", "Interrupt Service Routine",
+  "startup code", "bootloader", "register access", "bit manipulation",
+  "Flash", "SRAM", "EEPROM", "GPIO", "Timers", "Watchdog Timer", "WDT",
+  "Interrupt Controller", "NVIC", "ADC", "DAC", "PWM", "Clock System", "PLL",
+  // AUTOSAR & Automotive Diagnostics
+  "AUTOSAR", "AUTOSAR Classic", "AUTOSAR Adaptive", "RTE", "BSW", "MCAL",
+  "NvM", "DEM", "DCM", "ComM", "PduR", "CanIf", "CanTp",
+  "OBD", "OBDClassic", "OBDonUDS", "ZEVOnUDS", "UDS", "ISO 14229", "ISO 27145",
+  "Diagnostic Session Control", "ECU Reset", "Read DTC", "Read Data By Identifier",
+  "Security Access", "Routine Control", "Tester Present",
+  // Communication Protocols
+  "FlexRay", "CAN", "CAN-FD", "LIN", "I2C", "UART", "SPI", "Ethernet", "DoIP", "DoCAN",
+  // OS & RTOS Concepts
+  "FreeRTOS", "RTOS", "Process", "Thread", "Context Switching", "Scheduling",
+  "Mutex", "Semaphore", "Deadlock", "Priority Inversion", "Priority Inheritance",
+  "Critical Section", "Race Condition", "Memory Protection", "MPU", "Virtual Memory", "Polling"
 ];
 
 const keywordsQuery = keywordList.map(k => `&keywords=${encodeURIComponent(k)}:2`).join('');
@@ -212,6 +233,7 @@ export function startWebSocketServer(port: number = 8000) {
             console.log("Trigger received, querying LLM...");
             let resumeCtx = data.resume || '';
             const jobRole = data.jobRole || '';
+            const domainPreset = data.domainPreset || 'all-in-one';
             const imageData = data.image || '';
 
             if (typeof data.query === 'string') {
@@ -231,7 +253,7 @@ export function startWebSocketServer(port: number = 8000) {
               return;
             }
 
-            const systemMessage = getSystemPrompt("v6", jobRole, resumeCtx);
+            const systemMessage = getSystemPrompt(domainPreset, jobRole, resumeCtx);
             const userContent: any[] = [];
 
             if (contextBuffer.trim()) {

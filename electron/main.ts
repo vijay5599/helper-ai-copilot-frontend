@@ -19,7 +19,7 @@ function createWindow() {
   const initialHeight = Math.min(400, 800);
 
   mainWindow = new BrowserWindow({
-    width: 800,
+    width: 920,
     height: initialHeight,
     alwaysOnTop: true,
     transparent: true,
@@ -69,18 +69,6 @@ function createWindow() {
     mainWindow = null;
   });
 }
-
-ipcMain.on('resize-window', (event, height) => {
-  if (mainWindow) {
-    const bounds = mainWindow.getBounds();
-    mainWindow.setBounds({
-      x: bounds.x,
-      y: bounds.y,
-      width: bounds.width,
-      height: Math.ceil(height)
-    });
-  }
-});
 
 app.whenReady().then(() => {
   // Register custom protocol handler for app:// to serve local static files securely
@@ -146,18 +134,22 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.on('resize-window', (event, { height }) => {
+  ipcMain.on('resize-window', (event, data) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
+      const rawHeight = typeof data === 'number' ? data : data?.height;
+      if (!rawHeight || isNaN(rawHeight)) return;
+
       const bounds = mainWindow.getBounds();
       const currentDisplay = screen.getDisplayMatching(bounds);
       const maxAllowedHeight = Math.floor(currentDisplay.workAreaSize.height * 0.85);
-      const targetHeight = Math.min(Math.ceil(height), maxAllowedHeight);
+      const targetHeight = Math.min(Math.ceil(rawHeight), maxAllowedHeight);
+      const targetWidth = bounds.width > 0 ? bounds.width : 920;
 
-      if (bounds.height !== targetHeight) {
+      if (bounds.height !== targetHeight || bounds.width !== targetWidth) {
         mainWindow.setBounds({
           x: bounds.x,
           y: bounds.y,
-          width: bounds.width,
+          width: targetWidth,
           height: targetHeight
         });
       }
